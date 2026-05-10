@@ -3084,6 +3084,8 @@ function renderMySessions(){
 // DSAT MODAL + ACK
 // ════════════════════════════════════════════════════════════
 function openDsatModal(specId){
+  // Make sure dropdowns are populated if user opens this before visiting the DSAT page
+  populateAllSelects();
   // Reset to "add" mode
   document.getElementById('dsat-modal-title').textContent = 'Add DSAT Feedback Entry';
   document.getElementById('dsat-save-btn').textContent = 'Save DSAT Entry';
@@ -3102,6 +3104,7 @@ function openDsatModal(specId){
 
 function openEditDsat(id){
   const d = db.dsats.find(x=>x.id===id); if(!d){ toast('Entry not found.', false); return; }
+  populateAllSelects();
   document.getElementById('dsat-modal-title').textContent = `Edit DSAT — Ticket #${d.ticketId}`;
   document.getElementById('dsat-save-btn').textContent = '💾 Save Changes';
   document.getElementById('d-edit-id').value = id;
@@ -3275,15 +3278,15 @@ function renderMultiPick(container, source, selectedSet, onChange){
       <span>${esc(item)}</span>
     </label>`;
   };
-  if(source && source.groups){
+  if(Array.isArray(source)){
+    source.forEach(it => { html += renderItem(it); });
+  } else if(source && source.groups){
     source.groups.forEach(g => {
       html += `<div class="mp-group-label">${esc(g.label)}</div>`;
       g.items.forEach(it => { html += renderItem(it); });
     });
-  } else if(source && source.flat){
+  } else if(source && Array.isArray(source.flat)){
     source.flat.forEach(it => { html += renderItem(it); });
-  } else if(Array.isArray(source)){
-    source.forEach(it => { html += renderItem(it); });
   } else {
     container.setAttribute('data-empty', container.dataset.empty || 'No options');
     container.innerHTML = '';
