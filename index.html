@@ -2762,7 +2762,8 @@ function renderPermissions(){
 
   // Password table
   document.getElementById('pass-tbody').innerHTML = SPECIALISTS.map(s=>{
-    const hasPass = db.specPasswords[s.id] && db.specPasswords[s.id].length>0;
+    const pw = db.specPasswords[s.id];
+    const hasPass = pw != null && String(pw).length > 0;
     return`<tr>
       <td><div style="display:flex;align-items:center;gap:8px">
         ${avatarHTML(s,26,10,7)}
