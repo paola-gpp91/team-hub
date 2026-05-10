@@ -1502,9 +1502,18 @@ const STORE_KEY = 'teamhub_v3';
 const SHEET_URL_KEY = 'teamhub_sheet_url';
 
 // ════════════════════════════════════════════════════════════
+// BAKED-IN CLOUD SYNC URL
+// Paste your Apps Script Web App URL between the quotes below.
+// When set, every device that opens this page will auto-connect to your sheet —
+// specialists don't need to paste a URL on their device. The Settings → Cloud Sync
+// override is still available for testing.
+// ════════════════════════════════════════════════════════════
+const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyrU3EZcqNP0KfFF0zNJoxl-Px1SjzY7sKewrMIH8qZxkxz9hjPbCItVQqk1xMc1ft1ZA/exec';   // ← paste your /exec URL here
+
+// ════════════════════════════════════════════════════════════
 // CLOUD SYNC (Google Apps Script backend)
 // ════════════════════════════════════════════════════════════
-let SHEET_API_URL = localStorage.getItem(SHEET_URL_KEY) || '';
+let SHEET_API_URL = localStorage.getItem(SHEET_URL_KEY) || BUILT_IN_SHEET_URL || '';
 let _pendingSync = null;       // {tab, op, row|id} — set right before saveDB() to push that change
 let _syncQueue = [];           // queue of pending changes if multiple writes happen in quick succession
 let _syncInFlight = false;
@@ -1513,8 +1522,8 @@ let _lastSyncError = null;
 function isCloudEnabled(){ return !!SHEET_API_URL; }
 
 function setSheetUrl(url){
-  SHEET_API_URL = (url||'').trim();
-  if(SHEET_API_URL) localStorage.setItem(SHEET_URL_KEY, SHEET_API_URL);
+  SHEET_API_URL = (url||'').trim() || BUILT_IN_SHEET_URL || '';
+  if(url && url.trim()) localStorage.setItem(SHEET_URL_KEY, SHEET_API_URL);
   else localStorage.removeItem(SHEET_URL_KEY);
 }
 
