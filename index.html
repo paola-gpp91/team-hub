@@ -1629,6 +1629,21 @@ function hydrateFromCloud(cloud){
   // Settings
   db.settings = cloud.settings || {};
   if(db.settings.adminPin) db.pin = String(db.settings.adminPin);
+  // Specialist passwords now live in Settings as spec_pw_<id> rows (more reliable
+  // than the Specialists tab, which has number-coercion issues).
+  // Merge them in — keeping any passwords still on the legacy Specialists.password column
+  // as a fallback so this migration is backward-compatible.
+  if(!db.specPasswords) db.specPasswords = {};
+  Object.keys(db.settings).forEach(k => {
+    if(k.indexOf('spec_pw_') === 0){
+      const sid = k.slice('spec_pw_'.length);
+      const v = db.settings[k];
+      if(v != null && v !== '') db.specPasswords[sid] = String(v);
+      else if(db.specPasswords[sid] == null) db.specPasswords[sid] = '';
+    }
+  });
+  console.log('[Team Hub] Passwords loaded for:',
+    Object.keys(db.specPasswords).filter(k => db.specPasswords[k]).join(', ') || '(none)');
   // Persist as local cache so offline still works
   localStorage.setItem(STORE_KEY, JSON.stringify(db));
 }
@@ -2850,28 +2865,61 @@ function toggleLead(sid, makeLead){
   renderSpecialists();
 }
 
-function saveSpecPassword(sid){
+async function saveSpecPassword(sid){
   const nw  = document.getElementById(`pw-new-${sid}`)?.value || '';
   const cf  = document.getElementById(`pw-confirm-${sid}`)?.value || '';
   if(!nw){ toast('Please enter a password.', false); return; }
   if(nw.length < 4){ toast('Password must be at least 4 characters.', false); return; }
   if(nw !== cf){ toast('Passwords do not match.', false); return; }
   if(!db.specPasswords) db.specPasswords={};
+  if(!db.settings) db.settings={};
   db.specPasswords[sid] = nw;
-  _pendingSync = {tab:'Specialists', op:'update', row:specialistRowForSheet(sid)};
+  db.settings['spec_pw_' + sid] = nw;
   saveDB();
-  toast(`✅ Password set for ${SPECIALISTS.find(s=>s.id===sid)?.name.split(' ')[0]}.`);
+  // Push as a Settings row (same mechanism as adminPin — bulletproof)
+  if(isCloudEnabled()){
+    try {
+      const res = await fetch(SHEET_API_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({action:'setting', key:'spec_pw_'+sid, value: nw})
+      });
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.error || 'Failed');
+      toast(`✅ Password set for ${SPECIALISTS.find(s=>s.id===sid)?.name.split(' ')[0]}.`);
+    } catch(err){
+      toast('⚠ Saved locally but cloud sync failed: '+err.message, false);
+    }
+  } else {
+    toast(`✅ Password set for ${SPECIALISTS.find(s=>s.id===sid)?.name.split(' ')[0]} (local only — cloud not connected).`);
+  }
   renderPermissions();
 }
 
-function clearSpecPassword(sid){
+async function clearSpecPassword(sid){
   const name = SPECIALISTS.find(s=>s.id===sid)?.name.split(' ')[0];
   if(!confirm(`Remove password for ${name}? They won't be able to log in until a new one is set.`)) return;
   if(!db.specPasswords) db.specPasswords={};
+  if(!db.settings) db.settings={};
   db.specPasswords[sid] = '';
-  _pendingSync = {tab:'Specialists', op:'update', row:specialistRowForSheet(sid)};
+  db.settings['spec_pw_' + sid] = '';
   saveDB();
-  toast(`Password cleared for ${name}.`);
+  if(isCloudEnabled()){
+    try {
+      const res = await fetch(SHEET_API_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({action:'setting', key:'spec_pw_'+sid, value: ''})
+      });
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.error || 'Failed');
+      toast(`Password cleared for ${name}.`);
+    } catch(err){
+      toast('⚠ Cleared locally but cloud sync failed: '+err.message, false);
+    }
+  } else {
+    toast(`Password cleared for ${name} (local only).`);
+  }
   renderPermissions();
 }
 
