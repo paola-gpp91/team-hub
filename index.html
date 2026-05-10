@@ -1543,6 +1543,7 @@ async function cloudPush(change){
     _lastSyncError = String(err);
     updateSyncIndicator(false);
     console.error('Cloud sync error:', err);
+    toast('⚠ Sync failed: ' + String(err).replace('Error: ', '').slice(0, 80), false);
     toast('⚠️ Cloud sync failed — saved locally', false);
   } finally {
     _syncInFlight = false;
