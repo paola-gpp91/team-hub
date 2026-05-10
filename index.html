@@ -1567,8 +1567,10 @@ function hydrateFromCloud(cloud){
   if(cloudSpecs.length){
     SPECIALISTS.length = 0;
     cloudSpecs.forEach(cs=>{
+      const sid = cs.id != null ? String(cs.id).trim() : '';
+      if(!sid) return;
       SPECIALISTS.push({
-        id: cs.id,
+        id: sid,
         name: cs.name,
         initials: cs.initials,
         color: parseInt(cs.color)||0,
@@ -1582,17 +1584,22 @@ function hydrateFromCloud(cloud){
   db.specPasswords = {};
   db.permissions   = {};
   cloudSpecs.forEach(cs=>{
-    // Coerce password to string — Google Sheets returns numeric values as numbers,
-    // so an all-digits password like "1234" would arrive as 1234 (number) and break
-    // .length checks on the login screen.
-    db.specPasswords[cs.id] = cs.password != null && cs.password !== '' ? String(cs.password) : '';
-    db.permissions[cs.id]   = {
+    // Coerce id and password to string. Google Sheets returns numeric-looking values
+    // as numbers (e.g. an all-digits password "1234" arrives as 1234), and a numeric
+    // id would mismatch with the seed string IDs in SPECIALISTS.
+    const sid = cs.id != null ? String(cs.id).trim() : '';
+    if(!sid) return;
+    db.specPasswords[sid] = cs.password != null && cs.password !== '' ? String(cs.password) : '';
+    db.permissions[sid]   = {
       teamMetrics: cs.permTeamMetrics===true || cs.permTeamMetrics==='TRUE' || cs.permTeamMetrics==='true',
       allDsats:    cs.permAllDsats===true    || cs.permAllDsats==='TRUE'    || cs.permAllDsats==='true',
       allSessions: cs.permAllSessions===true || cs.permAllSessions==='TRUE' || cs.permAllSessions==='true',
       allQas:      cs.permAllQas===true      || cs.permAllQas==='TRUE'      || cs.permAllQas==='true'
     };
   });
+  // Diagnostic log so we can see what got loaded
+  console.log('[Team Hub] Hydrated', cloudSpecs.length, 'specialists from cloud.',
+    'Passwords set for:', Object.keys(db.specPasswords).filter(k => db.specPasswords[k]).join(', ') || '(none)');
   // Other tabs
   db.metrics  = (cloud.metrics  || []).map(coerceNumeric);
   db.dsats    = (cloud.dsats    || []).map(d => ({...d, ackRating: d.ackRating!=null && d.ackRating!=='' ? +d.ackRating : null}));
@@ -1903,7 +1910,16 @@ function navTo(page, specId){
   if(page==='qas')           renderQaPage();
   if(page==='sessions')      renderSessionsPage();
   if(page==='calendar')      renderCalendar();
-  if(page==='permissions')   renderPermissions();
+  if(page==='permissions'){
+    renderPermissions();
+    // Auto-refresh from cloud so passwords and permissions reflect what's in the sheet
+    if(isCloudEnabled()){
+      cloudPull().then(cloud => {
+        hydrateFromCloud(cloud);
+        renderPermissions();
+      }).catch(err => console.warn('Permissions refresh pull failed:', err));
+    }
+  }
   if(page==='my-overview')   renderMyOverview();
   if(page==='my-metrics')    renderMyMetrics();
   if(page==='my-dsats')      renderMyDsats();
