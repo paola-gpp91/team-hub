@@ -1582,7 +1582,10 @@ function hydrateFromCloud(cloud){
   db.specPasswords = {};
   db.permissions   = {};
   cloudSpecs.forEach(cs=>{
-    db.specPasswords[cs.id] = cs.password || '';
+    // Coerce password to string — Google Sheets returns numeric values as numbers,
+    // so an all-digits password like "1234" would arrive as 1234 (number) and break
+    // .length checks on the login screen.
+    db.specPasswords[cs.id] = cs.password != null && cs.password !== '' ? String(cs.password) : '';
     db.permissions[cs.id]   = {
       teamMetrics: cs.permTeamMetrics===true || cs.permTeamMetrics==='TRUE' || cs.permTeamMetrics==='true',
       allDsats:    cs.permAllDsats===true    || cs.permAllDsats==='TRUE'    || cs.permAllDsats==='true',
@@ -1692,6 +1695,11 @@ function loadDB(){
     // Migrate: ensure specPasswords exists
     if(!saved.specPasswords) saved.specPasswords = Object.fromEntries(SPECIALISTS.map(s=>[s.id,'']));
     SPECIALISTS.forEach(s=>{ if(saved.specPasswords[s.id]===undefined) saved.specPasswords[s.id]=''; });
+    // Coerce to string defensively (numeric passwords like 1234 would otherwise lack .length)
+    Object.keys(saved.specPasswords).forEach(k => {
+      const v = saved.specPasswords[k];
+      saved.specPasswords[k] = v != null && v !== '' ? String(v) : '';
+    });
     if(!saved.permissions) saved.permissions = {};
     SPECIALISTS.forEach(s=>{
       if(!saved.permissions[s.id]) saved.permissions[s.id]={teamMetrics:false,allDsats:false,allSessions:false,allQas:false};
@@ -1765,7 +1773,8 @@ function onSpecSelect(){
   wrap.style.display = 'block';
   document.getElementById('spec-password').value = '';
   if(!db.specPasswords) db.specPasswords={};
-  const hasPass = db.specPasswords[specId] && db.specPasswords[specId].length > 0;
+  const pass = db.specPasswords[specId];
+  const hasPass = pass != null && String(pass).length > 0;
   hint.textContent = hasPass ? 'Enter your password to continue.' : 'No password set — ask your admin to set one in Permissions.';
   hint.style.color  = hasPass ? 'var(--text3)' : 'var(--amber)';
   setTimeout(()=>document.getElementById('spec-password').focus(), 50);
@@ -1801,9 +1810,9 @@ function doLogin(){
     const specId = document.getElementById('login-spec-select').value;
     if(!specId){ showLoginError('Please select your name.'); return; }
     if(!db.specPasswords) db.specPasswords={};
-    const storedPass = db.specPasswords[specId] || '';
+    const storedPass = db.specPasswords[specId] != null ? String(db.specPasswords[specId]) : '';
     if(!storedPass){ showLoginError('No password set for your account. Contact your admin to set one in Permissions.'); return; }
-    const entered = document.getElementById('spec-password').value;
+    const entered = String(document.getElementById('spec-password').value || '');
     if(!entered){ showLoginError('Please enter your password.'); return; }
     if(entered !== storedPass){ showLoginError('Incorrect password. Please try again.'); document.getElementById('spec-password').value=''; return; }
     session = {role:'specialist', specId};
