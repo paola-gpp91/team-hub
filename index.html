@@ -700,6 +700,7 @@ textarea{resize:vertical;min-height:78px}
       <div class="ph-left"><h1>📅 Calendar</h1><p>Schedule upcoming 1:1 sessions and get reminders</p></div>
       <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center">
         <button class="btn btn-secondary btn-sm" id="cal-notify-btn" onclick="requestNotificationPermission()">🔔 Enable Notifications</button>
+        <button class="btn btn-secondary btn-sm" onclick="downloadMonthIcs()">📥 Download Month (.ics)</button>
         <button class="btn btn-primary btn-sm" onclick="openApptModal()">+ Schedule Session</button>
       </div>
     </div>
@@ -1975,7 +1976,16 @@ function navTo(page, specId){
   if(page==='my-dsats')      renderMyDsats();
   if(page==='my-qas')        renderMyQas();
   if(page==='my-sessions')   renderMySessions();
-  if(page==='my-upcoming')   renderMyUpcoming();
+  if(page==='my-upcoming'){
+    renderMyUpcoming();
+    // Auto-refresh from cloud so any newly-scheduled 1:1s appear
+    if(isCloudEnabled()){
+      cloudPull().then(cloud => {
+        hydrateFromCloud(cloud);
+        renderMyUpcoming();
+      }).catch(err => console.warn('Upcoming refresh pull failed:', err));
+    }
+  }
   if(page==='settings'){
     const inp = document.getElementById('set-sheet-url');
     if(inp) inp.value = SHEET_API_URL || '';
@@ -4482,6 +4492,63 @@ function downloadIcs(id){
   document.body.appendChild(link); link.click(); document.body.removeChild(link);
   URL.revokeObjectURL(url);
   toast('📥 Calendar file downloaded.');
+}
+
+// Build a single VEVENT block string for an appointment.
+function buildIcsEvent_(a){
+  const sp = SPECIALISTS.find(x=>x.id===a.specialistId);
+  const start = new Date(`${a.date}T${a.time}`);
+  const end = new Date(start.getTime() + (a.duration||30)*60*1000);
+  const fmtIcs = d => d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+  // ICS spec: escape commas, semicolons, backslashes, newlines
+  const esc = s => String(s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
+  return [
+    'BEGIN:VEVENT',
+    `UID:${a.id}@team-hub`,
+    `DTSTAMP:${fmtIcs(new Date())}`,
+    `DTSTART:${fmtIcs(start)}`,
+    `DTEND:${fmtIcs(end)}`,
+    `SUMMARY:1:1 with ${esc(sp?sp.name:'Specialist')} (${esc(SES_TYPE_LABELS[a.type]||a.type)})`,
+    `DESCRIPTION:${esc(a.topics||'')}`,
+    'BEGIN:VALARM',
+    `TRIGGER:-PT${a.reminderMin>=0?a.reminderMin:15}M`,
+    'ACTION:DISPLAY',
+    `DESCRIPTION:Reminder: 1:1 with ${esc(sp?sp.name:'Specialist')}`,
+    'END:VALARM',
+    'END:VEVENT'
+  ].join('\r\n');
+}
+
+// Download all appointments in the currently-viewed calendar month as one .ics file.
+function downloadMonthIcs(){
+  const cursor = (typeof calCursor !== 'undefined' && calCursor) ? calCursor : new Date();
+  const y = cursor.getFullYear(), m = cursor.getMonth();
+  const monthStart = new Date(y, m, 1);
+  const monthEnd   = new Date(y, m+1, 1);
+  const list = (db.appointments||[]).filter(a => {
+    if(!a.date || !a.time) return false;
+    const d = new Date(`${a.date}T${a.time}`);
+    return !isNaN(d) && d >= monthStart && d < monthEnd;
+  }).sort((a,b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+  if(!list.length){ toast('No appointments scheduled in this month.', false); return; }
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Team Hub//1:1 Sessions//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:Team Hub — 1:1 Sessions ${monthStart.toLocaleString('en-US',{month:'long',year:'numeric'})}`,
+    ...list.map(buildIcsEvent_),
+    'END:VCALENDAR'
+  ].join('\r\n');
+  const blob = new Blob([lines], {type:'text/calendar;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const monthName = monthStart.toLocaleString('en-US',{month:'short',year:'numeric'}).replace(' ','-').toLowerCase();
+  link.href = url; link.download = `team-hub-1on1s-${monthName}.ics`;
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  toast(`📥 Downloaded ${list.length} session${list.length===1?'':'s'} for ${monthStart.toLocaleString('en-US',{month:'long',year:'numeric'})}.`);
 }
 
 // ════════════════════════════════════════════════════════════
