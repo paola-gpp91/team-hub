@@ -530,8 +530,25 @@ textarea{resize:vertical;min-height:78px}
       <div class="card-hd"><div><div class="card-title">New Entry</div></div></div>
       <div class="fg-grid" style="margin-bottom:18px">
         <div class="fg"><label>Specialist *</label><select id="m-spec"><option value="">Select…</option></select></div>
-        <div class="fg"><label>Week of (date) *</label><input type="date" id="m-date"></div>
-        <div class="fg"><label>Period Type</label><select id="m-period"><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
+        <div class="fg"><label>Period Type</label><select id="m-period" onchange="onMetricsPeriodChange()"><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
+        <!-- Weekly picker: shows week-of-year-and-month dropdown (Sunday–Saturday) -->
+        <div class="fg" id="m-weekly-wrap">
+          <label>Week (Sun – Sat) *</label>
+          <div style="display:flex;gap:6px">
+            <select id="m-week-year" onchange="onMetricsWeekYearChange()" style="flex:0 0 90px"></select>
+            <select id="m-week-pick" style="flex:1"></select>
+          </div>
+        </div>
+        <!-- Monthly picker: month + year dropdowns -->
+        <div class="fg" id="m-monthly-wrap" style="display:none">
+          <label>Month *</label>
+          <div style="display:flex;gap:6px">
+            <select id="m-month-month" style="flex:1"></select>
+            <select id="m-month-year" style="flex:0 0 90px"></select>
+          </div>
+        </div>
+        <!-- Hidden field — saveMetrics still reads from this for backward compatibility -->
+        <input type="hidden" id="m-date">
       </div>
       <div class="slabel">KPI Values</div>
       <div class="mi-grid">
@@ -2674,10 +2691,117 @@ function switchTab(prefix, tab){
 // ════════════════════════════════════════════════════════════
 // METRICS
 // ════════════════════════════════════════════════════════════
+
+// ───────────────────────────────────────────────────────────
+// Period picker (Weekly: Sun–Sat | Monthly: Month + Year)
+// ───────────────────────────────────────────────────────────
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// Returns the Sunday date for the week containing `d` (so weeks run Sun–Sat)
+function sundayOf(d){
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  x.setDate(x.getDate() - x.getDay()); // getDay: 0=Sun
+  return x;
+}
+
+// Format a Date as YYYY-MM-DD (local timezone, NOT UTC)
+function ymdLocal(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+
+// Initialize the period picker. Called from initMetricsPage / when navigating in.
+function initMetricsPeriodPicker(){
+  const now = new Date();
+  const curYear = now.getFullYear();
+  // Populate the year dropdowns with current year ± 1
+  const years = [curYear-1, curYear, curYear+1];
+  const yearOpts = years.map(y => `<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`).join('');
+  const wyEl = document.getElementById('m-week-year');
+  const myEl = document.getElementById('m-month-year');
+  if(wyEl) wyEl.innerHTML = yearOpts;
+  if(myEl) myEl.innerHTML = yearOpts;
+  // Populate month dropdown
+  const monthEl = document.getElementById('m-month-month');
+  if(monthEl){
+    monthEl.innerHTML = MONTH_NAMES.map((n,i) => `<option value="${i}" ${i===now.getMonth()?'selected':''}>${n}</option>`).join('');
+  }
+  // Build the week list for the current year, default to the current week
+  rebuildWeekOptions();
+  // Make sure the right wrapper is visible
+  onMetricsPeriodChange();
+}
+
+// Build all Sun–Sat weeks for the selected year and select the one containing today.
+function rebuildWeekOptions(){
+  const wpEl = document.getElementById('m-week-pick');
+  const wyEl = document.getElementById('m-week-year');
+  if(!wpEl || !wyEl) return;
+  const year = parseInt(wyEl.value, 10) || new Date().getFullYear();
+  // Find the first Sunday on or before Jan 1
+  const jan1 = new Date(year, 0, 1);
+  let cursor = sundayOf(jan1);
+  // Iterate week-by-week until we pass the year
+  const weeks = [];
+  while(cursor.getFullYear() <= year){
+    const sun = new Date(cursor);
+    const sat = new Date(cursor); sat.setDate(sat.getDate()+6);
+    // Stop once both Sun and Sat are past the year
+    if(sun.getFullYear() > year) break;
+    weeks.push({ sun: new Date(sun), sat: new Date(sat) });
+    cursor.setDate(cursor.getDate()+7);
+    // Safety guard
+    if(weeks.length > 60) break;
+  }
+  // Skip leading week(s) that belong entirely to the previous year
+  const filtered = weeks.filter(w => w.sat.getFullYear() === year || w.sun.getFullYear() === year);
+  // Build options
+  const todaySun = ymdLocal(sundayOf(new Date()));
+  const fmt = d => d.toLocaleDateString(undefined, {month:'short', day:'numeric'});
+  wpEl.innerHTML = filtered.map((w, i) => {
+    const key = ymdLocal(w.sun);
+    const label = `Week ${i+1} · ${fmt(w.sun)} – ${fmt(w.sat)}`;
+    return `<option value="${key}" ${key===todaySun?'selected':''}>${label}</option>`;
+  }).join('');
+  // If the user is looking at a year that doesn't contain today, just select the first week
+  if(!wpEl.value && filtered.length) wpEl.value = ymdLocal(filtered[0].sun);
+}
+
+// Called when the year dropdown changes (regenerate the week list)
+function onMetricsWeekYearChange(){ rebuildWeekOptions(); }
+
+// Toggle between Weekly and Monthly UIs
+function onMetricsPeriodChange(){
+  const isMonthly = document.getElementById('m-period').value === 'monthly';
+  const wkEl = document.getElementById('m-weekly-wrap');
+  const moEl = document.getElementById('m-monthly-wrap');
+  if(wkEl) wkEl.style.display = isMonthly ? 'none' : '';
+  if(moEl) moEl.style.display = isMonthly ? '' : 'none';
+}
+
+// Resolve the picker's current state into a YYYY-MM-DD anchor date.
+// Weekly → the Sunday of the chosen week. Monthly → the 1st of the chosen month.
+function getMetricsAnchorDate(){
+  const period = document.getElementById('m-period').value;
+  if(period === 'monthly'){
+    const m = parseInt(document.getElementById('m-month-month').value, 10);
+    const y = parseInt(document.getElementById('m-month-year').value, 10);
+    if(isNaN(m) || isNaN(y)) return '';
+    return ymdLocal(new Date(y, m, 1));
+  }
+  return document.getElementById('m-week-pick').value || '';
+}
+
 function saveMetrics(){
   const sid=document.getElementById('m-spec').value;
-  const date=document.getElementById('m-date').value;
-  if(!sid||!date){toast('Select a specialist and date.',false);return;}
+  const date=getMetricsAnchorDate();
+  if(!sid||!date){toast('Select a specialist and a valid period.',false);return;}
+  // Mirror to the hidden m-date for any legacy reader
+  const hidden = document.getElementById('m-date'); if(hidden) hidden.value = date;
   const entry={
     id:genId(),specialistId:sid,date,
     periodType:document.getElementById('m-period').value,
@@ -5134,8 +5258,8 @@ if(zone){
   zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');const f=e.dataTransfer.files[0];if(f){const fi=document.getElementById('csv-file-input');const dt=new DataTransfer();dt.items.add(f);fi.files=dt.files;previewCSV(fi);}});
 }
 
-// Set default date
-document.getElementById('m-date').value=today();
+// Initialize the metrics period picker on app load
+initMetricsPeriodPicker();
 
 // Auto-pull from cloud on app load (if configured) so logins use fresh data
 (async function bootstrapCloud(){
