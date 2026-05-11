@@ -489,6 +489,7 @@ textarea{resize:vertical;min-height:78px}
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="openEditProfileModal(currentSpec)">✏️ Edit Profile</button>
         <button class="btn btn-secondary btn-sm" onclick="openDsatModal(currentSpec)">+ Add DSAT</button>
         <button class="btn btn-secondary btn-sm" onclick="openQaModal(currentSpec)">+ Add QA</button>
         <button class="btn btn-primary btn-sm" onclick="openSessionModal(currentSpec)">+ New 1:1</button>
@@ -501,7 +502,9 @@ textarea{resize:vertical;min-height:78px}
       <button class="tab-btn" onclick="switchTab('sd','sessions')">1:1 Sessions</button>
       <button class="tab-btn" onclick="switchTab('sd','history')">Metrics History</button>
     </div>
-    <div class="tab-content active" id="sdtab-overview"><div class="stats-grid" id="sd-kpis"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:15px"><div class="card"><div class="card-hd"><div class="card-title">CSAT Trend</div></div><div class="chart-wrap"><canvas id="chart-sd-trend"></canvas></div></div><div class="card"><div class="card-hd"><div class="card-title">Last 1:1 Notes</div></div><div id="sd-latest-ses"></div></div></div>
+    <div class="tab-content active" id="sdtab-overview">
+      <div id="sd-contact"></div>
+      <div class="stats-grid" id="sd-kpis"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:15px"><div class="card"><div class="card-hd"><div class="card-title">CSAT Trend</div></div><div class="chart-wrap"><canvas id="chart-sd-trend"></canvas></div></div><div class="card"><div class="card-hd"><div class="card-title">Last 1:1 Notes</div></div><div id="sd-latest-ses"></div></div></div>
       <div class="card" style="margin-top:15px">
         <div class="card-hd" style="align-items:center;flex-wrap:wrap;gap:10px">
           <div><div class="card-title">📊 Failure Patterns</div><div class="card-sub">Where this specialist is losing points most often</div></div>
@@ -1205,6 +1208,27 @@ textarea{resize:vertical;min-height:78px}
   </div>
 </div>
 
+<!-- ════════ MODAL: EDIT SPECIALIST PROFILE ════════ -->
+<div class="modal-overlay" id="edit-profile-modal">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header"><span class="modal-title">Edit Specialist Profile</span><button class="modal-close" onclick="closeModal('edit-profile-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ep-spec-id">
+      <div class="fg-grid">
+        <div class="fg full"><label>Full Name *</label><input type="text" id="ep-name" placeholder="e.g. Candelaria Lucena"></div>
+        <div class="fg full"><label>Email</label><input type="email" id="ep-email" placeholder="name@cookunity.com"></div>
+        <div class="fg full"><label>Phone Number</label><input type="tel" id="ep-phone" placeholder="+54 11 1234-5678" inputmode="tel"></div>
+        <div class="fg full"><label>Address <span style="color:var(--text3);font-weight:500;text-transform:none;font-size:11px">(opens in Google Maps)</span></label><textarea id="ep-address" placeholder="Street, City, Country" style="min-height:70px"></textarea></div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5">💡 The initials and avatar color are derived from the name. Photo edits are in the photo modal (📷 icon on the specialist card).</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('edit-profile-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSpecProfile()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════ MODAL: CONFIRM DIALOG ════════ -->
 <div class="modal-overlay" id="confirm-modal">
   <div class="modal" style="max-width:440px">
@@ -1508,7 +1532,7 @@ const SHEET_URL_KEY = 'teamhub_sheet_url';
 // specialists don't need to paste a URL on their device. The Settings → Cloud Sync
 // override is still available for testing.
 // ════════════════════════════════════════════════════════════
-const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyrU3EZcqNP0KfFF0zNJoxl-Px1SjzY7sKewrMIH8qZxkxz9hjPbCItVQqk1xMc1ft1ZA/exec';   // ← paste your /exec URL here
+const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwI53I83lIUJfcKZ4F1db5H1N4S_Ik5gQko5P9byhklsC00IsiJTo-zx5N2xWclTYlyiw/exec';   // ← paste your /exec URL here
 
 // ════════════════════════════════════════════════════════════
 // CLOUD SYNC (Google Apps Script backend)
@@ -1584,6 +1608,8 @@ function hydrateFromCloud(cloud){
         initials: cs.initials,
         color: parseInt(cs.color)||0,
         email: cs.email||'',
+        phone: cs.phone||'',
+        address: cs.address||'',
         photo: cs.photo||'',
         role: (cs.role==='lead' || cs.role==='Lead' || cs.role==='LEAD') ? 'lead' : 'specialist'
       });
@@ -2111,6 +2137,8 @@ function specialistRowForSheet(sid){
     initials: s.initials||'',
     color: s.color!=null ? s.color : 0,
     email: s.email||'',
+    phone: s.phone||'',
+    address: s.address||'',
     photo: s.photo||'',
     role: s.role || 'specialist',
     password: (db.specPasswords && db.specPasswords[sid]) || '',
@@ -2196,6 +2224,56 @@ function savePhoto(){
   }
   closeModal('photo-modal');
   toast(`✅ Photo updated for ${s.name.split(' ')[0]}.`);
+}
+
+// ════════════════════════════════════════════════════════════
+// EDIT SPECIALIST PROFILE (name, email, phone, address)
+// ════════════════════════════════════════════════════════════
+function openEditProfileModal(sid){
+  const s = SPECIALISTS.find(x=>x.id===sid); if(!s){ toast('Specialist not found.', false); return; }
+  document.getElementById('ep-spec-id').value = sid;
+  document.getElementById('ep-name').value    = s.name    || '';
+  document.getElementById('ep-email').value   = s.email   || '';
+  document.getElementById('ep-phone').value   = s.phone   || '';
+  document.getElementById('ep-address').value = s.address || '';
+  openModal('edit-profile-modal');
+  setTimeout(()=>document.getElementById('ep-name').focus(), 80);
+}
+
+function saveSpecProfile(){
+  const sid     = document.getElementById('ep-spec-id').value;
+  const name    = document.getElementById('ep-name').value.trim();
+  const email   = document.getElementById('ep-email').value.trim();
+  const phone   = document.getElementById('ep-phone').value.trim();
+  const address = document.getElementById('ep-address').value.trim();
+  if(!name){ toast('Name is required.', false); return; }
+  const s = SPECIALISTS.find(x=>x.id===sid); if(!s){ toast('Specialist not found.', false); return; }
+  // Update in-memory record
+  s.name    = name;
+  s.email   = email;
+  s.phone   = phone;
+  s.address = address;
+  // Refresh initials from the new name (first letter of first + last words)
+  const parts = name.split(/\s+/).filter(Boolean);
+  s.initials = (parts[0]?.[0] || '?').toUpperCase() + (parts.length>1 ? (parts[parts.length-1][0]||'').toUpperCase() : '');
+  // Mirror onto db.customSpecialists if present (for custom-added specialists)
+  if(!Array.isArray(db.customSpecialists)) db.customSpecialists = [];
+  const cs = db.customSpecialists.find(x=>x.id===sid);
+  if(cs){
+    cs.name = name; cs.email = email; cs.phone = phone; cs.address = address; cs.initials = s.initials;
+  }
+  _pendingSync = {tab:'Specialists', op:'update', row:specialistRowForSheet(sid)};
+  saveDB();
+  // If the currently logged-in user is this specialist, refresh the chip too
+  if(session?.role==='specialist' && session.specId === sid){
+    setUserChip(s.name.split(' ')[0], 'specialist', s.initials, null, s.color, s.photo);
+  }
+  closeModal('edit-profile-modal');
+  toast(`✅ Profile updated for ${s.name.split(' ')[0]}.`);
+  // Re-render anywhere the name/info is shown
+  renderSpecialists();
+  if(currentSpec === sid) renderSpecDetail(sid);
+  populateAllSelects();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2480,6 +2558,26 @@ function renderSpecDetail(sid){
 }
 
 function renderSDOverview(sid){
+  const s = SPECIALISTS.find(x=>x.id===sid) || {};
+  // Contact card (email, phone, address — only renders if any field is set)
+  const contactEl = document.getElementById('sd-contact');
+  if(contactEl){
+    const bits = [];
+    if(s.email){
+      bits.push(`<a href="mailto:${esc(s.email)}" style="display:inline-flex;align-items:center;gap:6px;color:var(--text);text-decoration:none;padding:6px 11px;background:var(--surface);border:1px solid var(--border);border-radius:99px;font-size:12px;font-weight:600">✉️ ${esc(s.email)}</a>`);
+    }
+    if(s.phone){
+      const telHref = s.phone.replace(/[^\d+]/g, '');
+      bits.push(`<a href="tel:${esc(telHref)}" style="display:inline-flex;align-items:center;gap:6px;color:var(--text);text-decoration:none;padding:6px 11px;background:var(--surface);border:1px solid var(--border);border-radius:99px;font-size:12px;font-weight:600">📞 ${esc(s.phone)}</a>`);
+    }
+    if(s.address){
+      const mapsHref = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.address);
+      bits.push(`<a href="${mapsHref}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;color:var(--text);text-decoration:none;padding:6px 11px;background:var(--surface);border:1px solid var(--border);border-radius:99px;font-size:12px;font-weight:600" title="Open in Google Maps">📍 ${esc(s.address)}</a>`);
+    }
+    contactEl.innerHTML = bits.length
+      ? `<div class="card" style="margin-bottom:15px;padding:14px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${bits.join('')}</div></div>`
+      : `<div class="card" style="margin-bottom:15px;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div style="font-size:12px;color:var(--text3)">No contact info on file.</div><button class="btn btn-secondary btn-xs" onclick="openEditProfileModal('${sid}')">+ Add info</button></div>`;
+  }
   const latest=getLatest(sid), prev=getPrev(sid);
   const kpisEl=document.getElementById('sd-kpis');
   if(!latest){
