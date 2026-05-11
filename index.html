@@ -1533,7 +1533,7 @@ const SHEET_URL_KEY = 'teamhub_sheet_url';
 // specialists don't need to paste a URL on their device. The Settings → Cloud Sync
 // override is still available for testing.
 // ════════════════════════════════════════════════════════════
-const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwI53I83lIUJfcKZ4F1db5H1N4S_Ik5gQko5P9byhklsC00IsiJTo-zx5N2xWclTYlyiw/exec';   // ← paste your /exec URL here
+const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyXlD3MXYh85FBYKABUGQym70SQZlv6Eq2A7mJdFTuGf_pq1Z_tlIqkk6kwyffdCU5Vfw/exec';   // ← paste your /exec URL here
 
 // ════════════════════════════════════════════════════════════
 // CLOUD SYNC (Google Apps Script backend)
@@ -1652,12 +1652,32 @@ function hydrateFromCloud(cloud){
     flaggedBySpec: q.flaggedBySpec===true || q.flaggedBySpec==='TRUE' || q.flaggedBySpec==='true'
   }));
   db.sessions = (cloud.sessions || []).map(s => ({...s, mood: s.mood!=null && s.mood!=='' ? +s.mood : null, duration: s.duration!=null && s.duration!=='' ? +s.duration : null}));
-  db.appointments = (cloud.appointments || []).map(a => ({
-    ...a,
-    duration: a.duration!=null && a.duration!=='' ? +a.duration : 30,
-    reminderMin: a.reminderMin!=null && a.reminderMin!=='' ? +a.reminderMin : 15,
-    notified: a.notified===true || a.notified==='TRUE' || a.notified==='true'
-  }));
+  db.appointments = (cloud.appointments || []).map(a => {
+    // Defensively normalize date + time so the filter logic works regardless of
+    // what format the sheet returns. If `time` came back as anything that
+    // doesn't match HH:mm, try to extract it; fall back to 00:00.
+    let date = a.date || '';
+    let time = a.time || '';
+    if(time && !/^\d{2}:\d{2}/.test(time)){
+      // Try parsing as Date — if it's an ISO-ish timestamp or formatted differently
+      const d = new Date(time);
+      if(!isNaN(d)){
+        time = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      } else {
+        time = '00:00';
+      }
+    }
+    // If date came back as a Date-ish full timestamp, take just the YYYY-MM-DD part
+    if(date && /T/.test(date)) date = date.slice(0,10);
+    return {
+      ...a,
+      date,
+      time,
+      duration: a.duration!=null && a.duration!=='' ? +a.duration : 30,
+      reminderMin: a.reminderMin!=null && a.reminderMin!=='' ? +a.reminderMin : 15,
+      notified: a.notified===true || a.notified==='TRUE' || a.notified==='true'
+    };
+  });
   db.talkingPoints = (cloud.talkingPoints || []).map(t => ({
     ...t,
     discussed: t.discussed===true || t.discussed==='TRUE' || t.discussed==='true'
