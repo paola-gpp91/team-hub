@@ -6,6 +6,7 @@
 <title>Team Hub</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#F2F4F9;--surface:#FFFFFF;--surface2:#F7F8FB;--surface3:#EEF0F5;
@@ -370,7 +371,7 @@ textarea{resize:vertical;min-height:78px}
     <div class="nav-item" data-page="specialists" onclick="navTo('specialists')"><span class="ni">👥</span>Specialists</div>
     <div class="nav-sec">Metrics</div>
     <div class="nav-item" data-page="metrics" onclick="navTo('metrics')"><span class="ni">📊</span>Record Metrics</div>
-    <div class="nav-item" data-page="import" onclick="navTo('import')"><span class="ni">⬆️</span>Import CSV</div>
+    <div class="nav-item" data-page="import" onclick="navTo('import')"><span class="ni">⬆️</span>Bulk Import</div>
     <div class="nav-item" data-page="analytics" onclick="navTo('analytics')"><span class="ni">📈</span>Analytics</div>
     <div class="nav-sec">Coaching</div>
     <div class="nav-item" data-page="dsats" onclick="navTo('dsats')"><span class="ni">🔔</span>DSAT Feedback<span class="nav-badge" id="dsat-badge" style="display:none">0</span></div>
@@ -391,6 +392,7 @@ textarea{resize:vertical;min-height:78px}
     <div class="nav-item" data-page="my-qas" onclick="navTo('my-qas')"><span class="ni">🎯</span>My QA<span class="nav-badge" id="my-qa-badge" style="display:none">0</span></div>
     <div class="nav-item" data-page="my-sessions" onclick="navTo('my-sessions')"><span class="ni">📝</span>My 1:1 Sessions</div>
     <div class="nav-item" data-page="my-upcoming" onclick="navTo('my-upcoming')"><span class="ni">📅</span>My Upcoming 1:1s<span class="nav-badge" id="my-upcoming-badge" style="display:none;background:var(--accent)">0</span></div>
+    <div class="nav-item" id="nav-my-feedback" data-page="my-feedback" onclick="navTo('my-feedback')" style="display:none"><span class="ni">👑</span>My Feedback<span class="nav-badge" id="my-feedback-badge" style="display:none;background:var(--accent)">0</span></div>
   </div>
 
   <div class="sb-bottom">
@@ -498,7 +500,8 @@ textarea{resize:vertical;min-height:78px}
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('sd','overview')">Overview</button>
       <button class="tab-btn" onclick="switchTab('sd','dsats')">DSAT Feedback</button>
-      <button class="tab-btn" onclick="switchTab('sd','qas')">QA Feedback</button>
+      <button class="tab-btn" id="sd-tab-qas" onclick="switchTab('sd','qas')">QA Feedback</button>
+      <button class="tab-btn" id="sd-tab-lead" onclick="switchTab('sd','lead')" style="display:none">👑 Lead Feedback</button>
       <button class="tab-btn" onclick="switchTab('sd','sessions')">1:1 Sessions</button>
       <button class="tab-btn" onclick="switchTab('sd','history')">Metrics History</button>
     </div>
@@ -519,6 +522,7 @@ textarea{resize:vertical;min-height:78px}
     </div>
     <div class="tab-content" id="sdtab-dsats"><div id="sd-dsats"></div></div>
     <div class="tab-content" id="sdtab-qas"><div id="sd-qas"></div></div>
+    <div class="tab-content" id="sdtab-lead"><div id="sd-lead"></div></div>
     <div class="tab-content" id="sdtab-sessions"><div id="sd-sessions"></div></div>
     <div class="tab-content" id="sdtab-history"><div id="sd-history"></div></div>
   </div>
@@ -576,45 +580,106 @@ textarea{resize:vertical;min-height:78px}
 
   <!-- ══════════ ADMIN: IMPORT CSV ══════════ -->
   <div class="page" id="page-import">
-    <div class="ph"><div class="ph-left"><h1>Import CSV</h1><p>Upload a CSV file to bulk-load metrics for your team</p></div></div>
-    <div class="card">
-      <div class="card-hd"><div><div class="card-title">Expected Format</div><div class="card-sub">CSV must have a header row. Column names are flexible (case-insensitive).</div></div></div>
-      <div class="tw">
-        <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
-        <tbody>
-          <tr><td><code>specialist</code></td><td>Specialist Name</td><td>Candelaria Lucena</td><td style="color:var(--accent);font-weight:600">Required — must match name exactly</td></tr>
-          <tr><td><code>date</code></td><td>Week of</td><td>2025-07-14</td><td>YYYY-MM-DD</td></tr>
-          <tr><td><code>csat</code></td><td>CSAT %</td><td>87.5</td><td></td></tr>
-          <tr><td><code>aht</code></td><td>AHT (min)</td><td>6.2</td><td></td></tr>
-          <tr><td><code>tph</code></td><td>Tickets per hour</td><td>5.2</td><td></td></tr>
-          <tr><td><code>qa</code></td><td>QA Score %</td><td>91.5</td><td></td></tr>
-          <tr><td><code>tickets</code></td><td>Tickets Handled</td><td>124</td><td></td></tr>
-          <tr><td><code>dsats</code></td><td>DSATs</td><td>2</td><td></td></tr>
-          <tr><td><code>adherence</code></td><td>Adherence %</td><td>96.0</td><td></td></tr>
-          <tr><td><code>escalations</code></td><td>Escalations</td><td>1</td><td></td></tr>
-          <tr><td><code>notes</code></td><td>Notes</td><td>Great week</td><td>Optional</td></tr>
-        </tbody></table>
+    <div class="ph"><div class="ph-left"><h1>Bulk Import</h1><p>Upload a CSV or XLSX file to bulk-load metrics or QA entries</p></div></div>
+
+    <div class="tab-bar" style="margin-bottom:18px">
+      <button class="tab-btn active" data-imp-tab="metrics" onclick="switchImportTab('metrics')">📊 Metrics</button>
+      <button class="tab-btn" data-imp-tab="qas" onclick="switchImportTab('qas')">🎯 QA</button>
+    </div>
+
+    <!-- ─────────── METRICS IMPORT ─────────── -->
+    <div class="imp-tab-content" id="imp-tab-metrics">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">📊 Metrics Format</div><div class="card-sub">CSV or XLSX with a header row. Column names are case-insensitive.</div></div></div>
+        <div class="tw">
+          <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>specialist</code></td><td>Specialist Name</td><td>Candelaria Lucena</td><td style="color:var(--accent);font-weight:600">Required — must match name exactly</td></tr>
+            <tr><td><code>date</code></td><td>Anchor date</td><td>2026-05-10</td><td>YYYY-MM-DD · Sunday (weekly) or 1st of month (monthly)</td></tr>
+            <tr><td><code>periodType</code></td><td>Weekly / Monthly</td><td>weekly</td><td><code>weekly</code> or <code>monthly</code> (default: weekly)</td></tr>
+            <tr><td><code>csat</code></td><td>CSAT %</td><td>87.5</td><td></td></tr>
+            <tr><td><code>aht</code></td><td>AHT (min)</td><td>6.2</td><td></td></tr>
+            <tr><td><code>tph</code></td><td>Tickets per hour</td><td>5.2</td><td></td></tr>
+            <tr><td><code>qa</code></td><td>QA Score %</td><td>91.5</td><td></td></tr>
+            <tr><td><code>tickets</code></td><td>Tickets Handled</td><td>124</td><td></td></tr>
+            <tr><td><code>dsats</code></td><td>DSATs</td><td>2</td><td></td></tr>
+            <tr><td><code>adherence</code></td><td>Adherence %</td><td>96.0</td><td></td></tr>
+            <tr><td><code>escalations</code></td><td>Escalations</td><td>1</td><td></td></tr>
+            <tr><td><code>notes</code></td><td>Notes</td><td>Great week</td><td>Optional</td></tr>
+            <tr><td><code>recognition</code></td><td>Recognition</td><td>Resolved tough case</td><td>Optional — shown on Recognition Wall</td></tr>
+          </tbody></table>
+        </div>
+        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate()">📥 Download blank template</button></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-hd"><div class="card-title">Upload File</div></div>
+        <label class="csv-zone" id="csv-zone" for="csv-file-input">
+          <input type="file" id="csv-file-input" accept=".csv,.xlsx,.xls,text/csv" onchange="previewMetricsFile(this)">
+          <div style="font-size:28px;margin-bottom:10px">📁</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to select CSV or XLSX file</div>
+          <div style="font-size:12px;color:var(--text3)">or drag and drop</div>
+        </label>
+        <div id="csv-status" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+        <div id="csv-preview-wrap" style="display:none;margin-top:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Preview (first 8 rows)</div>
+          <div class="tw" id="csv-preview-table"></div>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:14px;align-items:center">
+          <button class="btn btn-primary" id="csv-import-btn" onclick="importCSV()" disabled>⬆️ Import Records</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearCSVImport()">Clear</button>
+          <span id="csv-import-status" style="font-size:12px;color:var(--text3)"></span>
+        </div>
       </div>
     </div>
-    <div class="card">
-      <div class="card-hd"><div class="card-title">Upload File</div></div>
-      <label class="csv-zone" id="csv-zone" for="csv-file-input">
-        <input type="file" id="csv-file-input" accept=".csv,text/csv" onchange="previewCSV(this)">
-        <div style="font-size:28px;margin-bottom:10px">📁</div>
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to select CSV file</div>
-        <div style="font-size:12px;color:var(--text3)">or drag and drop</div>
-      </label>
-      <div id="csv-status" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
-      <div id="csv-preview-wrap" style="display:none;margin-top:14px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Preview (first 8 rows)</div>
-        <div class="tw" id="csv-preview-table"></div>
+
+    <!-- ─────────── QA IMPORT ─────────── -->
+    <div class="imp-tab-content" id="imp-tab-qas" style="display:none">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">🎯 QA Format</div><div class="card-sub">CSV or XLSX with a header row. One row per QA entry.</div></div></div>
+        <div class="tw">
+          <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>specialist</code></td><td>Specialist Name</td><td>Candelaria Lucena</td><td style="color:var(--accent);font-weight:600">Required — must match name exactly</td></tr>
+            <tr><td><code>ticketId</code></td><td>Ticket ID</td><td>12345678</td><td style="color:var(--accent);font-weight:600">Required</td></tr>
+            <tr><td><code>date</code></td><td>Review date</td><td>2026-05-08</td><td style="color:var(--accent);font-weight:600">Required (YYYY-MM-DD) — SLA starts here</td></tr>
+            <tr><td><code>score</code></td><td>Score 0–100</td><td>70</td><td style="color:var(--accent);font-weight:600">Required</td></tr>
+            <tr><td><code>categoryKey</code></td><td>Category</td><td>processes</td><td style="color:var(--accent);font-weight:600">Required — see valid keys below</td></tr>
+            <tr><td><code>subcategory</code></td><td>Subcategories</td><td>"Wrong escalation in Admin, No follow-up"</td><td>Optional · Comma-separated for multi-select</td></tr>
+            <tr><td><code>feedback</code></td><td>Feedback</td><td>Missed escalation step</td><td style="color:var(--accent);font-weight:600">Required — shown to specialist</td></tr>
+            <tr><td><code>reviewLink</code></td><td>Review link</td><td>https://...</td><td>Optional</td></tr>
+          </tbody></table>
+        </div>
+        <div style="margin-top:14px;padding:12px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Valid <code>categoryKey</code> values</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.7">
+            <code>issue-resolution</code> · <code>processes</code> · <code>validation</code> · <code>excellence</code> · <code>basic-assistance</code> · <code>autofail-unresolved</code> · <code>autofail-privacy</code> · <code>autofail-ai</code>
+          </div>
+        </div>
+        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadQaTemplate()">📥 Download blank template</button></div>
       </div>
-      <div style="display:flex;gap:9px;margin-top:14px;align-items:center">
-        <button class="btn btn-primary" id="csv-import-btn" onclick="importCSV()" disabled>⬆️ Import Records</button>
-        <button class="btn btn-secondary btn-sm" onclick="clearCSVImport()">Clear</button>
-        <span id="csv-import-status" style="font-size:12px;color:var(--text3)"></span>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-hd"><div class="card-title">Upload File</div></div>
+        <label class="csv-zone" id="qa-csv-zone" for="qa-csv-file-input">
+          <input type="file" id="qa-csv-file-input" accept=".csv,.xlsx,.xls,text/csv" onchange="previewQaFile(this)">
+          <div style="font-size:28px;margin-bottom:10px">📁</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to select CSV or XLSX file</div>
+          <div style="font-size:12px;color:var(--text3)">or drag and drop</div>
+        </label>
+        <div id="qa-csv-status" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+        <div id="qa-csv-preview-wrap" style="display:none;margin-top:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Preview (first 8 rows)</div>
+          <div class="tw" id="qa-csv-preview-table"></div>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:14px;align-items:center">
+          <button class="btn btn-primary" id="qa-csv-import-btn" onclick="importQaCSV()" disabled>⬆️ Import QA Records</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearQaCSVImport()">Clear</button>
+          <span id="qa-csv-import-status" style="font-size:12px;color:var(--text3)"></span>
+        </div>
       </div>
     </div>
+
   </div>
 
   <!-- ══════════ ADMIN: ANALYTICS ══════════ -->
@@ -744,6 +809,17 @@ textarea{resize:vertical;min-height:78px}
   <div class="page" id="page-permissions">
     <div class="ph"><div class="ph-left"><h1>Permissions</h1><p>Manage specialist passwords and access control</p></div></div>
 
+    <div class="card" id="email-coverage-card">
+      <div class="card-hd">
+        <div><div class="card-title">📧 Email Notifications</div><div class="card-sub">Specialists without an email on file won't receive DSAT, QA, or 1:1 notifications.</div></div>
+        <div id="email-coverage-summary" style="font-size:12px;color:var(--text3);font-weight:600"></div>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>Specialist</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="email-tbody"></tbody>
+      </table></div>
+    </div>
+
     <div class="card">
       <div class="card-hd">
         <div><div class="card-title">🔑 Specialist Passwords</div><div class="card-sub">Set or update each specialist's login password. Minimum 4 characters.</div></div>
@@ -821,6 +897,7 @@ textarea{resize:vertical;min-height:78px}
   <!-- ══════════ SPECIALIST: MY OVERVIEW ══════════ -->
   <div class="page" id="page-my-overview">
     <div class="ph"><div class="ph-left"><h1 id="my-overview-title">My Overview</h1><p>Your performance summary</p></div></div>
+    <div id="my-next-1on1"></div>
     <div class="stats-grid" id="my-kpis"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
       <div class="card"><div class="card-hd"><div class="card-title">My CSAT Trend</div></div><div class="chart-wrap"><canvas id="chart-my-trend"></canvas></div></div>
@@ -883,6 +960,21 @@ textarea{resize:vertical;min-height:78px}
     <div id="my-upcoming-list"></div>
   </div>
 
+  <!-- ══════════ SPECIALIST (LEAD): MY FEEDBACK ══════════ -->
+  <div class="page" id="page-my-feedback">
+    <div class="ph">
+      <div class="ph-left"><h1>👑 My Feedback</h1><p>War Room, Wabi, and DSAT feedback your admin has logged about your work</p></div>
+      <select id="my-fb-filter" onchange="renderMyFeedback()" style="font-size:12px;width:auto;padding:7px 11px">
+        <option value="">All Types</option>
+        <option value="warroom">🏛 War Room</option>
+        <option value="wabi">🐰 Wabi</option>
+        <option value="dsat">📉 DSAT</option>
+      </select>
+    </div>
+    <div class="stats-grid" id="my-fb-stats"></div>
+    <div id="my-fb-list"></div>
+  </div>
+
 </main>
 
 <!-- ════════ MODAL: ADD DSAT ════════ -->
@@ -941,12 +1033,12 @@ textarea{resize:vertical;min-height:78px}
         <div class="fg"><label>QA Date *</label><input type="date" id="q-date"></div>
         <div class="fg"><label>Score *</label><input type="number" id="q-score" placeholder="0–100" min="0" max="100" step="1"></div>
         <div class="fg full"><label>Review Link</label><input type="url" id="q-link" placeholder="https://… (link to the recorded review)"></div>
-        <div class="fg full"><label>Rubric Category *</label>
-          <select id="q-cat" onchange="onQaCategoryChange()"><option value="">Select category…</option></select>
+        <div class="fg full"><label>Rubric Categories <span style="color:var(--text3);font-weight:500;text-transform:none;font-size:11px">(check all that apply)</span> *</label>
+          <div id="q-cat-multi" class="multi-pick"></div>
         </div>
-        <div class="fg full"><label>Subcategories <span style="color:var(--text3);font-weight:500;text-transform:none;font-size:11px">(check all that apply)</span></label>
-          <div id="q-subcat-multi" class="multi-pick" data-empty="— Select a category first"></div>
-          <div style="font-size:11px;color:var(--text3);margin-top:5px;line-height:1.5">💡 Score is auto-suggested from the category (-30 for Processes regardless of how many subcategories you check). Adjust manually if needed.</div>
+        <div class="fg full"><label>Subcategories <span style="color:var(--text3);font-weight:500;text-transform:none;font-size:11px">(check all that apply, grouped by category)</span></label>
+          <div id="q-subcat-multi" class="multi-pick" data-empty="— Select at least one category first"></div>
+          <div style="font-size:11px;color:var(--text3);margin-top:5px;line-height:1.5">💡 Type the final score manually — when multiple rubric categories apply, deductions don't stack predictably.</div>
         </div>
         <div class="fg full"><label>QA Feedback (shown to specialist) *</label><textarea id="q-feedback" placeholder="Detailed feedback on the evaluation…" style="min-height:100px"></textarea></div>
       </div>
@@ -1027,7 +1119,7 @@ textarea{resize:vertical;min-height:78px}
     <div class="modal-body">
       <div id="s-talking-points-slot"></div>
       <div class="fg-grid">
-        <div class="fg"><label>Specialist *</label><select id="s-spec" onchange="refreshSessionTalkingPoints()"><option value="">Select…</option></select></div>
+        <div class="fg"><label>Specialist *</label><select id="s-spec" onchange="onSessionSpecChange()"><option value="">Select…</option></select></div>
         <div class="fg"><label>Session Date *</label><input type="date" id="s-date"></div>
         <div class="fg"><label>Session Type</label>
           <select id="s-type"><option value="regular">Regular 1:1</option><option value="performance">Performance Review</option><option value="coaching">Coaching Session</option><option value="dsat-followup">DSAT Follow-Up</option><option value="development">Development Plan</option><option value="other">Other</option></select></div>
@@ -1070,6 +1162,44 @@ textarea{resize:vertical;min-height:78px}
                 <option value="action">🚨 Training needed</option>
               </select>
               <textarea id="s-wfm-tools-note" placeholder="Knowledge base, internal tools, processes…" style="min-height:50px;font-size:12px"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="fg full" id="s-lead-feedback-wrap" style="display:none">
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            <span>👑 Lead Feedback <span style="text-transform:none;font-weight:500;color:var(--text3);font-size:11px">(replaces QA — this specialist is a Lead)</span></span>
+          </label>
+          <div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(99,102,241,.06));border:1px solid rgba(124,58,237,.2);border-radius:10px;padding:13px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🏛 War Room</div>
+              <select id="s-lead-warroom-status" style="font-size:12px;padding:6px 9px;margin-bottom:6px">
+                <option value="">—</option>
+                <option value="good">✓ Strong</option>
+                <option value="concern">⚠ Concern</option>
+                <option value="action">🚨 Action needed</option>
+              </select>
+              <textarea id="s-lead-warroom-note" placeholder="Participation, contribution, escalations handled…" style="min-height:50px;font-size:12px"></textarea>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🐰 Wabi's Feedback</div>
+              <select id="s-lead-wabi-status" style="font-size:12px;padding:6px 9px;margin-bottom:6px">
+                <option value="">—</option>
+                <option value="good">✓ Strong</option>
+                <option value="concern">⚠ Concern</option>
+                <option value="action">🚨 Action needed</option>
+              </select>
+              <textarea id="s-lead-wabi-note" placeholder="Wabi escalations, accuracy, follow-through…" style="min-height:50px;font-size:12px"></textarea>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📉 DSAT Feedback</div>
+              <select id="s-lead-dsat-status" style="font-size:12px;padding:6px 9px;margin-bottom:6px">
+                <option value="">—</option>
+                <option value="good">✓ Strong</option>
+                <option value="concern">⚠ Concern</option>
+                <option value="action">🚨 Action needed</option>
+              </select>
+              <textarea id="s-lead-dsat-note" placeholder="DSAT trends, root causes spotted, coaching given…" style="min-height:50px;font-size:12px"></textarea>
             </div>
           </div>
         </div>
@@ -1243,6 +1373,39 @@ textarea{resize:vertical;min-height:78px}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('edit-profile-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveSpecProfile()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ MODAL: ADD LEAD FEEDBACK (standalone) ════════ -->
+<div class="modal-overlay" id="lead-feedback-modal">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header"><span class="modal-title">👑 Add Lead Feedback</span><button class="modal-close" onclick="closeModal('lead-feedback-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="lf-spec-id">
+      <div class="fg-grid">
+        <div class="fg"><label>Date *</label><input type="date" id="lf-date"></div>
+        <div class="fg"><label>Type *</label>
+          <select id="lf-type">
+            <option value="warroom">🏛 War Room</option>
+            <option value="wabi" selected>🐰 Wabi Feedback</option>
+            <option value="dsat">📉 DSAT Feedback</option>
+          </select>
+        </div>
+        <div class="fg full"><label>Status</label>
+          <select id="lf-status">
+            <option value="">—</option>
+            <option value="good">✓ Strong</option>
+            <option value="concern">⚠ Concern</option>
+            <option value="action">🚨 Action needed</option>
+          </select>
+        </div>
+        <div class="fg full"><label>Note *</label><textarea id="lf-note" placeholder="What happened, what's the takeaway, what's the follow-up…" style="min-height:120px"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('lead-feedback-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLeadFeedback()">💾 Save Feedback</button>
     </div>
   </div>
 </div>
@@ -1455,6 +1618,16 @@ const QA_SUBCATEGORIES = {
   }
 };
 
+// Returns the array of QA_CATEGORIES entries for a QA's categoryKey
+// (which may be a single key or a comma-separated list). Legacy keys are migrated.
+function qaCategories(q){
+  return asMultiList(q && q.categoryKey)
+    .map(migrateLegacyQaCategory)
+    .filter(Boolean)
+    .map(k => QA_CATEGORIES.find(c => c.key === k))
+    .filter(Boolean);
+}
+
 // Subcategories that carry a different (smaller) deduction. Returns null if normal.
 function subcategoryOverride(catKey, subcat){
   if(catKey === 'processes'){
@@ -1550,7 +1723,7 @@ const SHEET_URL_KEY = 'teamhub_sheet_url';
 // specialists don't need to paste a URL on their device. The Settings → Cloud Sync
 // override is still available for testing.
 // ════════════════════════════════════════════════════════════
-const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyXlD3MXYh85FBYKABUGQym70SQZlv6Eq2A7mJdFTuGf_pq1Z_tlIqkk6kwyffdCU5Vfw/exec';   // ← paste your /exec URL here
+const BUILT_IN_SHEET_URL = '';   // ← paste your /exec URL here
 
 // ════════════════════════════════════════════════════════════
 // CLOUD SYNC (Google Apps Script backend)
@@ -1629,7 +1802,7 @@ function hydrateFromCloud(cloud){
         phone: cs.phone||'',
         address: cs.address||'',
         photo: cs.photo||'',
-        role: (cs.role==='lead' || cs.role==='Lead' || cs.role==='LEAD') ? 'lead' : 'specialist'
+        role: String(cs.role || '').toLowerCase() === 'lead' ? 'lead' : 'specialist'
       });
     });
   }
@@ -1688,6 +1861,7 @@ function hydrateFromCloud(cloud){
     if(date && /T/.test(date)) date = date.slice(0,10);
     return {
       ...a,
+      specialistId: a.specialistId != null ? String(a.specialistId).trim() : '',
       date,
       time,
       duration: a.duration!=null && a.duration!=='' ? +a.duration : 30,
@@ -1695,9 +1869,16 @@ function hydrateFromCloud(cloud){
       notified: a.notified===true || a.notified==='TRUE' || a.notified==='true'
     };
   });
+  // Same coercion for talking points — they reference both specialistId and appointmentId
   db.talkingPoints = (cloud.talkingPoints || []).map(t => ({
     ...t,
+    specialistId: t.specialistId != null ? String(t.specialistId).trim() : '',
+    appointmentId: t.appointmentId != null ? String(t.appointmentId).trim() : '',
     discussed: t.discussed===true || t.discussed==='TRUE' || t.discussed==='true'
+  }));
+  db.leadFeedback = (cloud.leadFeedback || []).map(f => ({
+    ...f,
+    specialistId: f.specialistId != null ? String(f.specialistId).trim() : ''
   }));
   // Settings
   db.settings = cloud.settings || {};
@@ -1765,6 +1946,7 @@ function loadDB(){
     });
     if(!Array.isArray(saved.appointments)) saved.appointments = [];
     if(!Array.isArray(saved.talkingPoints)) saved.talkingPoints = [];
+    if(!Array.isArray(saved.leadFeedback)) saved.leadFeedback = [];
     // Migrate: ensure customSpecialists exists, and re-hydrate them into SPECIALISTS
     if(!Array.isArray(saved.customSpecialists)) saved.customSpecialists = [];
     saved.customSpecialists.forEach(cs=>{
@@ -1805,7 +1987,7 @@ function loadDB(){
 }
 function defaultDB(){
   return {
-    metrics:[], dsats:[], sessions:[], qas:[], appointments:[], talkingPoints:[],
+    metrics:[], dsats:[], sessions:[], qas:[], appointments:[], talkingPoints:[], leadFeedback:[],
     pin: DEFAULT_PIN,
     customSpecialists: [],
     specPasswords: Object.fromEntries(SPECIALISTS.map(s=>[s.id,''])),
@@ -1937,12 +2119,20 @@ function showApp(){
     document.getElementById('spec-nav').style.display = 'block';
     const s = SPECIALISTS.find(x=>x.id===session.specId);
     setUserChip(s.name.split(' ')[0], 'specialist', s.initials, null, s.color, s.photo);
+    // Leads use My Feedback instead of My QA (QA reviews don't apply to them).
+    const isLead = String(s.role || '').toLowerCase() === 'lead';
+    console.log(`[Team Hub] Specialist login: ${s.name} | role="${s.role}" | isLead=${isLead}`);
+    const navQa = document.querySelector('[data-page="my-qas"]');
+    const navFb = document.getElementById('nav-my-feedback');
+    if(navQa) navQa.style.display = isLead ? 'none' : '';
+    if(navFb) navFb.style.display = isLead ? '' : 'none';
     navTo('my-overview');
   }
   populateAllSelects();
   updateDsatBadges();
   if(typeof updateCalBadge === 'function') updateCalBadge();
   if(typeof updateMyUpcomingBadge === 'function') updateMyUpcomingBadge();
+  if(typeof updateMyFeedbackBadge === 'function') updateMyFeedbackBadge();
 }
 
 function setUserChip(name, role, initials, bg, colorIdx, photo){
@@ -1983,7 +2173,7 @@ function logout(){
 // NAVIGATION
 // ════════════════════════════════════════════════════════════
 const ADMIN_PAGES = ['dashboard','specialists','spec-detail','metrics','import','analytics','dsats','qas','sessions','calendar','permissions','settings'];
-const SPEC_PAGES  = ['my-overview','my-metrics','my-dsats','my-qas','my-sessions','my-upcoming'];
+const SPEC_PAGES  = ['my-overview','my-metrics','my-dsats','my-qas','my-sessions','my-upcoming','my-feedback'];
 
 function navTo(page, specId){
   const all = [...ADMIN_PAGES, ...SPEC_PAGES];
@@ -1991,13 +2181,32 @@ function navTo(page, specId){
   document.querySelectorAll('.nav-item[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
   if(page==='dashboard')     renderDashboard();
   if(page==='specialists')   renderSpecialists();
-  if(page==='spec-detail' && specId){ currentSpec=specId; renderSpecDetail(specId); }
+  if(page==='spec-detail' && specId){
+    currentSpec=specId;
+    renderSpecDetail(specId);
+    // Auto-refresh so any QA dispute, talking point, or new entry on this specialist appears
+    if(isCloudEnabled()){
+      cloudPull().then(cloud => {
+        hydrateFromCloud(cloud);
+        if(currentSpec === specId) renderSpecDetail(specId);
+      }).catch(err => console.warn('Spec-detail refresh pull failed:', err));
+    }
+  }
   if(page==='metrics')       renderMetricsPage();
   if(page==='analytics')     renderAnalytics();
   if(page==='dsats')         renderDsatPage();
   if(page==='qas')           renderQaPage();
   if(page==='sessions')      renderSessionsPage();
-  if(page==='calendar')      renderCalendar();
+  if(page==='calendar'){
+    renderCalendar();
+    // Auto-refresh from cloud so newly-added talking points from specialists appear
+    if(isCloudEnabled()){
+      cloudPull().then(cloud => {
+        hydrateFromCloud(cloud);
+        renderCalendar();
+      }).catch(err => console.warn('Calendar refresh pull failed:', err));
+    }
+  }
   if(page==='permissions'){
     renderPermissions();
     // Auto-refresh from cloud so passwords and permissions reflect what's in the sheet
@@ -2008,7 +2217,16 @@ function navTo(page, specId){
       }).catch(err => console.warn('Permissions refresh pull failed:', err));
     }
   }
-  if(page==='my-overview')   renderMyOverview();
+  if(page==='my-overview'){
+    renderMyOverview();
+    // Auto-refresh so any 1:1 the lead scheduled appears immediately
+    if(isCloudEnabled()){
+      cloudPull().then(cloud => {
+        hydrateFromCloud(cloud);
+        renderMyOverview();
+      }).catch(err => console.warn('My overview refresh pull failed:', err));
+    }
+  }
   if(page==='my-metrics')    renderMyMetrics();
   if(page==='my-dsats')      renderMyDsats();
   if(page==='my-qas')        renderMyQas();
@@ -2021,6 +2239,15 @@ function navTo(page, specId){
         hydrateFromCloud(cloud);
         renderMyUpcoming();
       }).catch(err => console.warn('Upcoming refresh pull failed:', err));
+    }
+  }
+  if(page==='my-feedback'){
+    renderMyFeedback();
+    if(isCloudEnabled()){
+      cloudPull().then(cloud => {
+        hydrateFromCloud(cloud);
+        renderMyFeedback();
+      }).catch(err => console.warn('My Feedback refresh pull failed:', err));
     }
   }
   if(page==='settings'){
@@ -2491,7 +2718,7 @@ function renderDashDisputes(){
   }
   el.innerHTML = open.slice(0,5).map(({q, sla}) => {
     const sp = SPECIALISTS.find(x=>x.id===q.specialistId);
-    const cat = QA_CATEGORIES.find(c=>c.key===q.categoryKey);
+    const cats = qaCategories(q);
     const scoreColor = q.score!=null ? (q.score>=90?'#34D399':q.score>=75?'#FCD34D':'#FCA5A5') : 'var(--text3)';
     const openedBy = q.disputeOpenedBy==='specialist' ? '👤 Specialist' : '🧑‍💼 Admin';
     return `<div class="appt-card" style="cursor:pointer;border-left:3px solid ${sla.color}" onclick="navTo('qas')">
@@ -2500,7 +2727,7 @@ function renderDashDisputes(){
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span style="font-size:13px;font-weight:700;color:var(--text)">${sp?esc(sp.name.split(' ')[0]):'?'} · #${esc(q.ticketId)}</span>
           ${q.score!=null?`<span class="badge bg-gray" style="font-weight:800;color:${scoreColor}">${q.score}/100</span>`:''}
-          ${cat?`<span class="badge ${cat.autofail?'bg-red':'bg-purple'}">${esc(cat.label.split(' ')[0])}</span>`:''}
+          ${cats.map(c=>`<span class="badge ${c.autofail?'bg-red':'bg-purple'}">${esc(c.label.split(' ')[0])}</span>`).join('')}
           ${q.flaggedBySpec?`<span class="badge" style="background:rgba(245,158,11,.15);color:#B45309;border:1px solid rgba(245,158,11,.3)">⚠ Flagged</span>`:''}
           <span class="badge bg-gray" style="font-size:9px">${openedBy}</span>
         </div>
@@ -2588,8 +2815,9 @@ function renderSpecDetail(sid){
   const s=SPECIALISTS.find(x=>x.id===sid);
   document.getElementById('spec-detail-name').textContent=s.name;
   const roleEl = document.getElementById('spec-detail-role');
+  const isLead = String(s.role || '').toLowerCase() === 'lead';
   if(roleEl){
-    if(s.role==='lead'){
+    if(isLead){
       roleEl.style.display='';
       roleEl.innerHTML='<span class="role-pill role-lead">⭐ Lead</span>';
     } else {
@@ -2597,11 +2825,18 @@ function renderSpecDetail(sid){
       roleEl.innerHTML='';
     }
   }
+  // Show/hide Lead Feedback tab — and hide standard QA tab for leads since
+  // their feedback flows through Lead Feedback instead.
+  const leadTabBtn = document.getElementById('sd-tab-lead');
+  const qaTabBtn = document.getElementById('sd-tab-qas');
+  if(leadTabBtn) leadTabBtn.style.display = isLead ? '' : 'none';
+  if(qaTabBtn)   qaTabBtn.style.display   = isLead ? 'none' : '';
   renderSDOverview(sid);
   renderSDDsats(sid);
   renderSDQas(sid);
   renderSDSessions(sid);
   renderSDHistory(sid);
+  if(isLead) renderSDLeadFeedback(sid);
 }
 
 function renderSDOverview(sid){
@@ -2665,6 +2900,51 @@ function renderSDQas(sid){
 function renderSDSessions(sid){
   const list=[...db.sessions.filter(s=>s.specialistId===sid)].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('sd-sessions').innerHTML=list.length?list.map(s=>renderSesCard(s,false,true)).join(''):'<div class="empty"><div class="ei">📝</div><p>No sessions</p></div>';
+}
+function renderSDLeadFeedback(sid){
+  const el = document.getElementById('sd-lead');
+  if(!el) return;
+  const all = gatherFeedbackForSpec(sid);
+
+  const typeMeta = {
+    warroom: {emoji:'🏛', label:'War Room'},
+    wabi:    {emoji:'🐰', label:'Wabi Feedback'},
+    dsat:    {emoji:'📉', label:'DSAT Feedback'}
+  };
+  const palette = {
+    good:    {bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.22)', color:'#059669',  emoji:'✓', label:'Strong'},
+    concern: {bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.25)', color:'#B45309',  emoji:'⚠', label:'Concern'},
+    action:  {bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  color:'#DC2626',  emoji:'🚨',label:'Action needed'}
+  };
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-hd">
+        <div><div class="card-title">👑 Lead Feedback</div><div class="card-sub">War Room, Wabi, and DSAT feedback — captured in 1:1s or logged ad-hoc</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openLeadFeedbackModal('${sid}')">+ Add Feedback</button>
+      </div>
+    </div>
+    ${all.length
+      ? all.map(it => {
+          const m = typeMeta[it._type] || {emoji:'•', label:it._type||''};
+          const p = palette[it._status] || {bg:'var(--surface)', border:'var(--border)', color:'var(--text2)', emoji:'—', label:'Not set'};
+          const isStandalone = it._source === 'standalone';
+          return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${p.color}">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:11px;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+                  <span style="font-size:13px;font-weight:800;color:var(--text)">${m.emoji} ${esc(m.label)}</span>
+                  <span style="font-size:11px;font-weight:700;color:${p.color};background:${p.bg};border:1px solid ${p.border};padding:2px 8px;border-radius:99px">${p.emoji} ${p.label}</span>
+                  <span style="font-size:11px;color:var(--text3)">${fmt(it._date)}${isStandalone?' · standalone':' · from 1:1'}</span>
+                </div>
+                ${it._note ? `<div style="font-size:13px;color:var(--text2);line-height:1.6">${esc(it._note)}</div>` : '<div style="font-size:11px;color:var(--text3);font-style:italic">No note added.</div>'}
+              </div>
+              ${isStandalone ? `<button class="btn btn-danger btn-xs" onclick="deleteLeadFeedback('${it.id}')">✕</button>` : ''}
+            </div>
+          </div>`;
+        }).join('')
+      : '<div class="empty" style="padding:40px"><div class="ei">👑</div><p>No lead feedback yet.<br><span style="font-size:11px;color:var(--text3);margin-top:6px;display:block">Capture War Room / Wabi / DSAT feedback during 1:1s, or click + Add Feedback to log it standalone.</span></p></div>'}
+  `;
 }
 function renderSDHistory(sid){
   const list=[...db.metrics.filter(m=>m.specialistId===sid)].sort((a,b)=>b.date.localeCompare(a.date));
@@ -2858,43 +3138,69 @@ function renderMetricsPage(){
 }
 
 // ════════════════════════════════════════════════════════════
-// CSV IMPORT
 // ════════════════════════════════════════════════════════════
-let parsedCSVRows=[];
-function previewCSV(input){
-  parsedCSVRows=[];
-  document.getElementById('csv-import-btn').disabled=true;
-  document.getElementById('csv-status').style.display='none';
-  document.getElementById('csv-preview-wrap').style.display='none';
-  const file=input.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const text=e.target.result;
-    const result=parseCSVText(text);
-    const statusEl=document.getElementById('csv-status');
-    if(result.error){
-      statusEl.textContent='❌ '+result.error;
-      statusEl.style.background='rgba(239,68,68,.1)';statusEl.style.color='#FCA5A5';statusEl.style.display='block';return;
+// BULK IMPORT — Metrics + QA (CSV and XLSX)
+// ════════════════════════════════════════════════════════════
+
+let parsedCSVRows = [];     // Metrics rows parsed and validated
+let parsedQaRows  = [];     // QA rows parsed and validated
+
+function switchImportTab(tab){
+  document.querySelectorAll('[data-imp-tab]').forEach(b => b.classList.toggle('active', b.dataset.impTab === tab));
+  document.getElementById('imp-tab-metrics').style.display = tab === 'metrics' ? '' : 'none';
+  document.getElementById('imp-tab-qas').style.display    = tab === 'qas'     ? '' : 'none';
+}
+
+// Read a file and resolve to an array of plain row objects (header → value).
+// Supports CSV (any encoding readable as text) and XLSX/XLS via SheetJS.
+function readSpreadsheetFile(file){
+  return new Promise((resolve, reject) => {
+    const name = (file.name || '').toLowerCase();
+    const isXlsx = name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.xlsm');
+    const reader = new FileReader();
+    if(isXlsx){
+      if(typeof XLSX === 'undefined'){
+        reject(new Error('XLSX library not loaded. Refresh the page and try again.'));
+        return;
+      }
+      reader.onload = e => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb   = XLSX.read(data, {type:'array', cellDates:false});
+          // Use the first sheet by default
+          const ws   = wb.Sheets[wb.SheetNames[0]];
+          if(!ws){ reject(new Error('Workbook has no sheets.')); return; }
+          // Get raw values (no formatting), with empty cells as ''
+          const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+          if(!rows.length){ reject(new Error('First sheet is empty.')); return; }
+          // Normalize keys to lowercase
+          const norm = rows.map(r => {
+            const o = {};
+            Object.keys(r).forEach(k => o[String(k).trim().toLowerCase()] = String(r[k] ?? '').trim());
+            return o;
+          });
+          resolve(norm);
+        } catch(err){ reject(new Error('Failed to parse XLSX: ' + err.message)); }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file.'));
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.onload = e => {
+        const result = parseCSVText(e.target.result);
+        if(result.error){ reject(new Error(result.error)); return; }
+        resolve(result);
+      };
+      reader.onerror = () => reject(new Error('Failed to read file.'));
+      reader.readAsText(file);
     }
-    parsedCSVRows=result;
-    const matched=parsedCSVRows.filter(r=>SPECIALISTS.find(s=>s.name.toLowerCase()===r.specialist?.toLowerCase())).length;
-    statusEl.textContent=`✅ Parsed ${parsedCSVRows.length} rows — ${matched} match specialists.`;
-    statusEl.style.background='rgba(16,185,129,.1)';statusEl.style.color='#34D399';statusEl.style.display='block';
-    document.getElementById('csv-import-btn').disabled=false;
-    // preview
-    const keys=Object.keys(parsedCSVRows[0]||{});
-    const preview=parsedCSVRows.slice(0,8);
-    document.getElementById('csv-preview-table').innerHTML=`<table><thead><tr>${keys.map(k=>`<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${preview.map(r=>`<tr>${keys.map(k=>`<td style="font-size:11px">${esc(r[k]||'')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    document.getElementById('csv-preview-wrap').style.display='block';
-  };
-  reader.readAsText(file);
+  });
 }
 
 function parseCSVText(text){
   if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
   const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
   if(!lines.length) return {error:'File is empty.'};
-  const rawHeaders=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+  const rawHeaders=splitCSVLine(lines[0]).map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
   const rows=[];
   for(let i=1;i<lines.length;i++){
     const vals=splitCSVLine(lines[i]);
@@ -2916,16 +3222,54 @@ function splitCSVLine(line){
   fields.push(cur);return fields;
 }
 
+// ─────────── METRICS IMPORT ───────────
+
+async function previewMetricsFile(input){
+  parsedCSVRows=[];
+  document.getElementById('csv-import-btn').disabled=true;
+  document.getElementById('csv-status').style.display='none';
+  document.getElementById('csv-preview-wrap').style.display='none';
+  const file=input.files[0];if(!file)return;
+  const statusEl=document.getElementById('csv-status');
+  try {
+    parsedCSVRows = await readSpreadsheetFile(file);
+  } catch(err){
+    statusEl.textContent='❌ '+err.message;
+    statusEl.style.background='rgba(239,68,68,.1)';statusEl.style.color='#FCA5A5';statusEl.style.display='block';
+    return;
+  }
+  // Filter to non-empty rows
+  parsedCSVRows = parsedCSVRows.filter(r => Object.values(r).some(v => v !== ''));
+  const matched=parsedCSVRows.filter(r=>SPECIALISTS.find(s=>s.name.toLowerCase()===(r.specialist||'').toLowerCase())).length;
+  const unmatched = parsedCSVRows.length - matched;
+  let msg = `✅ Parsed ${parsedCSVRows.length} rows — ${matched} match specialists.`;
+  if(unmatched) msg += ` ⚠ ${unmatched} will be skipped (specialist name doesn't match).`;
+  statusEl.textContent=msg;
+  statusEl.style.background = unmatched ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)';
+  statusEl.style.color      = unmatched ? '#F59E0B' : '#34D399';
+  statusEl.style.display='block';
+  document.getElementById('csv-import-btn').disabled = matched === 0;
+  // preview
+  const keys=Object.keys(parsedCSVRows[0]||{});
+  const preview=parsedCSVRows.slice(0,8);
+  document.getElementById('csv-preview-table').innerHTML=`<table><thead><tr>${keys.map(k=>`<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${preview.map(r=>{
+    const matched = !!SPECIALISTS.find(s=>s.name.toLowerCase()===(r.specialist||'').toLowerCase());
+    return `<tr style="${matched?'':'opacity:.5;background:rgba(245,158,11,.05)'}">${keys.map(k=>`<td style="font-size:11px">${esc(r[k]||'')}</td>`).join('')}</tr>`;
+  }).join('')}</tbody></table>`;
+  document.getElementById('csv-preview-wrap').style.display='block';
+}
+
 function importCSV(){
   if(!parsedCSVRows.length) return;
-  let imported=0,skipped=0;
+  let imported=0, skipped=0;
   const newEntries = [];
   parsedCSVRows.forEach(row=>{
     const spec=SPECIALISTS.find(s=>s.name.toLowerCase()===(row.specialist||'').toLowerCase());
     if(!spec){skipped++;return;}
-    const date=row.date||today();
+    const date=row.date || today();
+    const periodType = (row.periodtype || row.periodType || 'weekly').toLowerCase() === 'monthly' ? 'monthly' : 'weekly';
     const entry={
-      id:genId(),specialistId:spec.id,date,periodType:'weekly',
+      id:genId(),specialistId:spec.id,date,periodType,
       csat:pf(row.csat),tph:pf(row.tph),aht:pf(row.aht),qa:pf(row.qa),
       tickets:pi(row.tickets),dsats:pi(row.dsats),adherence:pf(row.adherence),
       escalations:pi(row.escalations),notes:(row.notes||'').trim(),
@@ -2936,14 +3280,12 @@ function importCSV(){
     newEntries.push(entry);
     imported++;
   });
-  // Save locally first
   localStorage.setItem(STORE_KEY, JSON.stringify(db));
-  // Push each to the cloud (queued, one at a time)
   if(isCloudEnabled()){
     newEntries.forEach(entry => cloudPush({tab:'Metrics', op:'insert', row:entry}));
   }
   document.getElementById('csv-import-status').textContent=`✅ ${imported} imported, ${skipped} skipped.${isCloudEnabled()?' Syncing to sheet…':''}`;
-  toast(`✅ Imported ${imported} records!`);
+  toast(`✅ Imported ${imported} metrics records!`);
   parsedCSVRows=[];
   document.getElementById('csv-import-btn').disabled=true;
 }
@@ -2955,6 +3297,142 @@ function clearCSVImport(){
   document.getElementById('csv-preview-wrap').style.display='none';
   document.getElementById('csv-import-btn').disabled=true;
   document.getElementById('csv-import-status').textContent='';
+}
+
+function downloadMetricsTemplate(){
+  const headers = ['specialist','date','periodType','csat','tph','qa','aht','tickets','dsats','adherence','escalations','notes','recognition'];
+  const sample = ['Candelaria Lucena','2026-05-10','weekly','87.5','5.2','91.5','6.2','124','2','96.0','1','Great week','Resolved tough case'];
+  const csv = headers.join(',') + '\n' + sample.join(',') + '\n';
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'metrics-template.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('📥 Template downloaded.');
+}
+
+// ─────────── QA IMPORT ───────────
+
+const VALID_QA_CATEGORY_KEYS = ['issue-resolution','processes','validation','excellence','basic-assistance','autofail-unresolved','autofail-privacy','autofail-ai'];
+
+async function previewQaFile(input){
+  parsedQaRows=[];
+  document.getElementById('qa-csv-import-btn').disabled=true;
+  document.getElementById('qa-csv-status').style.display='none';
+  document.getElementById('qa-csv-preview-wrap').style.display='none';
+  const file=input.files[0];if(!file)return;
+  const statusEl=document.getElementById('qa-csv-status');
+  let rows;
+  try {
+    rows = await readSpreadsheetFile(file);
+  } catch(err){
+    statusEl.textContent='❌ '+err.message;
+    statusEl.style.background='rgba(239,68,68,.1)';statusEl.style.color='#FCA5A5';statusEl.style.display='block';
+    return;
+  }
+  rows = rows.filter(r => Object.values(r).some(v => v !== ''));
+  // Validate each row and attach an error message if any
+  let validCount = 0, invalidCount = 0;
+  parsedQaRows = rows.map(r => {
+    const errors = [];
+    const sp = SPECIALISTS.find(s=>s.name.toLowerCase()===(r.specialist||'').toLowerCase());
+    if(!sp) errors.push('specialist not found');
+    if(!r.ticketid && !r.ticketId) errors.push('ticketId required');
+    if(!r.date) errors.push('date required');
+    const scoreNum = parseFloat(r.score);
+    if(r.score==='' || isNaN(scoreNum) || scoreNum<0 || scoreNum>100) errors.push('score 0–100 required');
+    const catKey = migrateLegacyQaCategory(r.categorykey || r.categoryKey || '');
+    if(!catKey || !VALID_QA_CATEGORY_KEYS.includes(catKey)) errors.push('invalid categoryKey');
+    if(!r.feedback) errors.push('feedback required');
+    if(errors.length){ invalidCount++; return {row:r, errors}; }
+    validCount++;
+    return {row:r, errors:[], spec:sp, catKey, scoreNum};
+  });
+  let msg = `✅ Parsed ${parsedQaRows.length} rows — ${validCount} valid.`;
+  if(invalidCount) msg += ` ⚠ ${invalidCount} will be skipped due to errors.`;
+  statusEl.textContent = msg;
+  statusEl.style.background = invalidCount ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)';
+  statusEl.style.color      = invalidCount ? '#F59E0B' : '#34D399';
+  statusEl.style.display='block';
+  document.getElementById('qa-csv-import-btn').disabled = validCount === 0;
+  const preview = parsedQaRows.slice(0,8);
+  const cols = ['specialist','ticketId','date','score','categoryKey','subcategory','feedback','reviewLink'];
+  const header = cols.map(c => `<th>${c}</th>`).join('') + '<th>Status</th>';
+  const body = preview.map(item => {
+    const r = item.row;
+    const rowStyle = item.errors.length ? 'opacity:.6;background:rgba(245,158,11,.05)' : '';
+    const valFor = c => esc(r[c.toLowerCase()] || r[c] || '');
+    const status = item.errors.length
+      ? `<span style="color:#F59E0B;font-size:11px">⚠ ${esc(item.errors.join(', '))}</span>`
+      : `<span style="color:#34D399;font-size:11px">✓ ok</span>`;
+    return `<tr style="${rowStyle}">${cols.map(c=>`<td style="font-size:11px">${valFor(c)}</td>`).join('')}<td>${status}</td></tr>`;
+  }).join('');
+  document.getElementById('qa-csv-preview-table').innerHTML = `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+  document.getElementById('qa-csv-preview-wrap').style.display='block';
+}
+
+function importQaCSV(){
+  if(!parsedQaRows.length) return;
+  let imported=0, skipped=0;
+  const newEntries = [];
+  parsedQaRows.forEach(item => {
+    if(item.errors.length){ skipped++; return; }
+    const r = item.row;
+    const qa = {
+      id: genId(),
+      specialistId: item.spec.id,
+      ticketId: String(r.ticketid || r.ticketId || '').trim(),
+      date: r.date,
+      score: item.scoreNum,
+      reviewLink: (r.reviewlink || r.reviewLink || '').trim(),
+      categoryKey: item.catKey,
+      subcategory: (r.subcategory || '').trim(), // comma-separated, already in the right shape
+      feedback: (r.feedback || '').trim(),
+      status: 'pending',
+      disputeStatus: 'none',
+      createdAt: new Date().toISOString()
+    };
+    db.qas.push(qa);
+    newEntries.push(qa);
+    imported++;
+  });
+  localStorage.setItem(STORE_KEY, JSON.stringify(db));
+  if(isCloudEnabled()){
+    newEntries.forEach(qa => cloudPush({tab:'QAs', op:'insert', row:qa}));
+  }
+  document.getElementById('qa-csv-import-status').textContent=`✅ ${imported} imported, ${skipped} skipped.${isCloudEnabled()?' Syncing to sheet…':''}`;
+  toast(`✅ Imported ${imported} QA records!`);
+  parsedQaRows=[];
+  document.getElementById('qa-csv-import-btn').disabled=true;
+  updateDsatBadges();
+  renderQaPage();
+}
+
+function clearQaCSVImport(){
+  parsedQaRows=[];
+  document.getElementById('qa-csv-file-input').value='';
+  document.getElementById('qa-csv-status').style.display='none';
+  document.getElementById('qa-csv-preview-wrap').style.display='none';
+  document.getElementById('qa-csv-import-btn').disabled=true;
+  document.getElementById('qa-csv-import-status').textContent='';
+}
+
+function downloadQaTemplate(){
+  const headers = ['specialist','ticketId','date','score','categoryKey','subcategory','feedback','reviewLink'];
+  const samples = [
+    ['Candelaria Lucena','12345678','2026-05-08','70','processes','"Wrong escalation in Admin, No follow-up"','Missed the escalation step','https://example.com/ticket/12345678'],
+    ['Walter Ylesca','12345679','2026-05-08','85','processes','Incorrect Tag (-15)','Wrong tag applied — partial deduction',''],
+    ['Alejandra Paredes','12345680','2026-05-09','100','basic-assistance','','Excellent ticket — all standards met','']
+  ];
+  const csv = headers.join(',') + '\n' + samples.map(r => r.join(',')).join('\n') + '\n';
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'qa-template.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('📥 Template downloaded.');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -3052,6 +3530,30 @@ function renderPermissions(){
     if(db.specPasswords[s.id]===undefined) db.specPasswords[s.id]='';
   });
 
+  // Email coverage table
+  const emailsSet  = SPECIALISTS.filter(s => s.email && String(s.email).trim()).length;
+  const emailsMiss = SPECIALISTS.length - emailsSet;
+  const summaryEl = document.getElementById('email-coverage-summary');
+  if(summaryEl){
+    summaryEl.innerHTML = emailsMiss === 0
+      ? `<span style="color:#10B981">✓ All ${SPECIALISTS.length} specialists will receive emails</span>`
+      : `<span style="color:#F59E0B">⚠ ${emailsMiss} of ${SPECIALISTS.length} missing an email — they won't be notified</span>`;
+  }
+  document.getElementById('email-tbody').innerHTML = SPECIALISTS.map(s=>{
+    const hasEmail = s.email && String(s.email).trim();
+    return `<tr ${!hasEmail?'style="background:rgba(245,158,11,.04)"':''}>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        ${avatarHTML(s,26,10,7)}
+        <span style="font-size:13px;font-weight:600">${s.name}</span>
+      </div></td>
+      <td style="font-size:12px;color:var(--text2)">${hasEmail ? esc(s.email) : '<span style="color:var(--text3);font-style:italic">— not set —</span>'}</td>
+      <td>${hasEmail
+        ? '<span class="badge bg-green">✓ Will receive emails</span>'
+        : '<span class="badge bg-amber">⚠ No notifications</span>'}</td>
+      <td><button class="btn btn-secondary btn-xs" onclick="openEditProfileModal('${s.id}')">${hasEmail?'✏️ Edit':'+ Add email'}</button></td>
+    </tr>`;
+  }).join('');
+
   // Password table
   document.getElementById('pass-tbody').innerHTML = SPECIALISTS.map(s=>{
     const pw = db.specPasswords[s.id];
@@ -3092,7 +3594,7 @@ function renderPermissions(){
   const rolesTbody = document.getElementById('roles-tbody');
   if(rolesTbody){
     rolesTbody.innerHTML = SPECIALISTS.map(s=>{
-      const isLead = s.role === 'lead';
+      const isLead = String(s.role || '').toLowerCase() === 'lead';
       return`<tr>
         <td><div style="display:flex;align-items:center;gap:8px">
           ${avatarHTML(s,26,10,7)}
@@ -3341,6 +3843,7 @@ function renderMyOverview(){
   const sid=session?.specId;if(!sid)return;
   const s=SPECIALISTS.find(x=>x.id===sid);
   document.getElementById('my-overview-title').textContent=`Hi, ${s.name.split(' ')[0]} 👋`;
+  renderMyNext1on1(sid);
   const latest=getLatest(sid),prev=getPrev(sid);
   if(!latest){
     document.getElementById('my-kpis').innerHTML=`<div class="stat-card" style="grid-column:1/-1"><div class="empty" style="padding:20px"><div class="ei">📊</div><p>No metrics recorded for you yet.</p></div></div>`;
@@ -3362,13 +3865,14 @@ function renderMyOverview(){
   const pendingQa = (db.qas||[]).filter(q=>q.specialistId===sid && q.status==='pending');
   document.getElementById('my-pending-qas').innerHTML = pendingQa.length
     ? pendingQa.map(q=>{
-        const cat = QA_CATEGORIES.find(c=>c.key===q.categoryKey);
+        const cats = qaCategories(q);
+        const catLabel = cats.length ? cats.map(c=>c.label).join(', ') : (q.categoryKey || '—');
         const sc  = q.score>=90?'#34D399':q.score>=75?'#FCD34D':'#FCA5A5';
         return `<div class="dsat-card pending" style="cursor:pointer" onclick="navTo('my-qas')">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
             <div>
               <div style="font-size:13px;font-weight:700;color:var(--text)">Ticket #${esc(q.ticketId)} · <span style="font-family:'Inter',sans-serif;color:${sc}">${q.score}/100</span></div>
-              <div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(cat?.label||q.categoryKey)}${asMultiList(q.subcategory).length?' · '+esc(asMultiList(q.subcategory).join(', ')):''} · ${fmt(q.date)}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(catLabel)}${asMultiList(q.subcategory).length?' · '+esc(asMultiList(q.subcategory).join(', ')):''} · ${fmt(q.date)}</div>
             </div>
             <button class="btn btn-warn btn-sm" onclick="event.stopPropagation();openQaAckModal('${q.id}')">Acknowledge</button>
           </div>
@@ -3376,6 +3880,64 @@ function renderMyOverview(){
       }).join('')
     : '<div class="empty" style="padding:24px"><div class="ei">🎯</div><p>All QA reviews acknowledged!</p></div>';
   updateDsatBadges();
+}
+
+// Renders a card at the top of the specialist's overview showing their NEXT
+// upcoming 1:1, with talking-points preview + quick-add button. Encourages
+// specialists to prep ahead of the meeting without needing to dig into a
+// separate page.
+function renderMyNext1on1(sid){
+  const el = document.getElementById('my-next-1on1');
+  if(!el) return;
+  const upcoming = upcomingAppointmentsFor(sid);
+  if(!upcoming.length){
+    el.innerHTML = '';
+    return;
+  }
+  const a = upcoming[0]; // soonest
+  const sp = SPECIALISTS.find(x=>x.id===a.specialistId);
+  const dt = new Date((a.date||'')+'T'+(a.time||'00:00'));
+  const monthShort = dt.toLocaleDateString(undefined,{month:'short'}).toUpperCase();
+  const dayNum = dt.getDate();
+  const time = a.time || '—';
+  // Days-until pill
+  const daysUntil = Math.ceil((dt - new Date()) / (1000*60*60*24));
+  let whenPill;
+  if(daysUntil <= 0)       whenPill = `<span style="background:#10B981;color:white;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700">Today</span>`;
+  else if(daysUntil === 1) whenPill = `<span style="background:#F59E0B;color:white;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700">Tomorrow</span>`;
+  else if(daysUntil <= 7)  whenPill = `<span style="background:rgba(99,102,241,.15);color:var(--accent);padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700">In ${daysUntil} days</span>`;
+  else                     whenPill = `<span style="background:var(--surface2);color:var(--text2);padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700">In ${daysUntil} days</span>`;
+  const points = pointsForAppointment(a.id).sort((x,y)=>(x.createdAt||'').localeCompare(y.createdAt||''));
+  const openCount = points.filter(p=>!p.discussed).length;
+  const more = upcoming.length > 1
+    ? `<a href="#" onclick="event.preventDefault();navTo('my-upcoming')" style="font-size:11px;color:var(--accent);text-decoration:none">+ ${upcoming.length-1} more upcoming →</a>`
+    : '';
+  el.innerHTML = `
+  <div class="card" style="margin-bottom:15px;border:1px solid rgba(99,102,241,.3);background:linear-gradient(135deg,rgba(99,102,241,.04),rgba(124,58,237,.06))">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">📅 Your Next 1:1</span>
+        ${whenPill}
+      </div>
+      ${more}
+    </div>
+    <div style="display:flex;gap:13px;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap">
+      <div class="appt-when"><div class="am">${monthShort}</div><div class="ad">${dayNum}</div><div class="at">${time}</div></div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(SES_TYPE_LABELS[a.type]||a.type)}${a.duration?' · '+a.duration+' min':''}</div>
+        ${a.topics?`<div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.55"><strong style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px">Agenda from your lead</strong>${esc(a.topics)}</div>`:''}
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:13px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em">💬 What do you want to discuss?${openCount?` <span style="background:var(--accent);color:white;padding:1px 8px;border-radius:99px;font-size:10px;margin-left:5px">${openCount}</span>`:''}</div>
+        <button class="btn btn-primary btn-xs" onclick="openAddTalkingPoint('${a.id}')">+ Add a point</button>
+      </div>
+      ${points.length
+        ? `<div style="display:flex;flex-direction:column;gap:6px">${points.map(p=>renderTalkingPoint(p, /*isSpecView*/true)).join('')}</div>`
+        : `<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:8px;padding:14px 16px;font-size:12px;color:var(--text3);line-height:1.55">No talking points yet. Add what's on your mind — questions, concerns, things you're proud of, blockers, anything you'd like feedback on. Your lead will see them before the meeting.</div>`}
+    </div>
+  </div>`;
 }
 
 function renderMyMetrics(){
@@ -3558,8 +4120,7 @@ function openQaModal(specId){
   document.getElementById('q-date').value=today();
   document.getElementById('q-ticket').value='';
   document.getElementById('q-link').value='';
-  document.getElementById('q-cat').value='';
-  populateQaSubcategories('', []);
+  populateQaCategories([]);  // also resets subcategory picker
   document.getElementById('q-feedback').value='';
   document.getElementById('q-score').value='';
   openModal('qa-modal');
@@ -3576,25 +4137,14 @@ function openEditQa(id){
   document.getElementById('q-date').value = q.date || today();
   document.getElementById('q-ticket').value = q.ticketId || '';
   document.getElementById('q-link').value = q.reviewLink || '';
-  const migratedCat = migrateLegacyQaCategory(q.categoryKey);
-  document.getElementById('q-cat').value = migratedCat || '';
-  // Re-check any saved subcategories that still exist in the current taxonomy.
-  // Old free-text values that don't match exactly are dropped silently.
-  populateQaSubcategories(migratedCat, asMultiList(q.subcategory));
+  // Pre-check saved categories — handle legacy single-value and new comma-separated forms.
+  const savedCats = asMultiList(q.categoryKey).map(migrateLegacyQaCategory).filter(Boolean);
+  populateQaCategories(savedCats);
+  // After categories render, re-check the saved subcategories
+  populateQaSubcategories(savedCats, asMultiList(q.subcategory));
   document.getElementById('q-feedback').value = q.feedback || '';
   document.getElementById('q-score').value = q.score!=null ? q.score : '';
   openModal('qa-modal');
-}
-
-function onQaCategoryChange(){
-  const key = document.getElementById('q-cat').value;
-  populateQaSubcategories(key, []);
-  // Pre-fill the score using the category default; multi-select is informational only.
-  const scoreEl = document.getElementById('q-score');
-  if(scoreEl.value === ''){
-    const suggested = suggestedQaScore(key, '');
-    if(suggested != null) scoreEl.value = suggested;
-  }
 }
 
 // Render the multi-pick checkbox list inside a container.
@@ -3647,24 +4197,80 @@ function readMultiPick(container){
   return Array.from(container.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
 }
 
-// Populate the q-subcat-multi multi-pick from QA_SUBCATEGORIES + pre-check saved items.
-function populateQaSubcategories(catKey, preselected){
+// Populate the q-cat-multi checkbox list with all QA categories.
+// preselected can be array or comma-separated string.
+function populateQaCategories(preselected){
+  const el = document.getElementById('q-cat-multi');
+  if(!el) return;
+  const preArr = (Array.isArray(preselected) ? preselected : asMultiList(preselected))
+    .map(migrateLegacyQaCategory)
+    .filter(Boolean);
+  const selected = new Set(preArr);
+  // Build a flat list of category labels but track them by key. We render labels
+  // and translate back to keys on read.
+  el.innerHTML = '';
+  el.removeAttribute('data-empty');
+  let html = '';
+  QA_CATEGORIES.forEach(cat => {
+    const checked = selected.has(cat.key);
+    const tagColor = cat.autofail ? '#EF4444' : 'var(--accent)';
+    const tagBg    = cat.autofail ? 'rgba(239,68,68,.1)' : 'rgba(99,102,241,.1)';
+    const deductTag = cat.autofail ? 'Autofail' : `−${cat.deduct}`;
+    html += `<label class="mp-item ${checked?'checked':''}" data-cat-key="${esc(cat.key)}">
+      <input type="checkbox" value="${esc(cat.key)}" ${checked?'checked':''}>
+      <span>${esc(cat.label)} <span style="display:inline-block;font-size:10px;font-weight:700;color:${tagColor};background:${tagBg};padding:2px 6px;border-radius:99px;margin-left:6px">${deductTag}</span></span>
+    </label>`;
+  });
+  el.innerHTML = html;
+  el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cb.parentElement.classList.toggle('checked', cb.checked);
+      // Rebuild the subcategory picker each time the category set changes
+      const currentCats = readMultiPick(el);
+      const currentSubs = readMultiPick(document.getElementById('q-subcat-multi'));
+      populateQaSubcategories(currentCats, currentSubs);
+    });
+  });
+  // Initial subcategory render
+  populateQaSubcategories(Array.from(selected), []);
+}
+
+// Populate the q-subcat-multi multi-pick from QA_SUBCATEGORIES.
+// catKeys can be a single key (legacy) or an array of keys.
+// Subcategories are grouped by their parent category so the user can see which
+// belongs to which.
+function populateQaSubcategories(catKeys, preselected){
   const el = document.getElementById('q-subcat-multi');
   if(!el) return;
-  if(!catKey){
+  const keys = Array.isArray(catKeys) ? catKeys.filter(Boolean) : (catKeys ? [catKeys] : []);
+  if(!keys.length){
     el.innerHTML = '';
-    el.setAttribute('data-empty', '— Select a category first');
+    el.setAttribute('data-empty', '— Select at least one category first');
     return;
   }
-  const config = QA_SUBCATEGORIES[catKey];
-  if(!config){
+  // Build a unified {groups:[...]} source by collecting each category's subcats.
+  // For categories whose config is "flat", wrap them in a single group titled by the category label.
+  const groups = [];
+  keys.forEach(k => {
+    const config = QA_SUBCATEGORIES[k];
+    const catDef = QA_CATEGORIES.find(c => c.key === k);
+    if(!config) return;
+    const catLabel = catDef ? catDef.label : k;
+    if(config.groups){
+      config.groups.forEach(g => {
+        groups.push({label: `${catLabel} → ${g.label}`, items: g.items});
+      });
+    } else if(config.flat){
+      groups.push({label: catLabel, items: config.flat});
+    }
+  });
+  if(!groups.length){
     el.innerHTML = '';
-    el.setAttribute('data-empty', '— No subcategories for this category');
+    el.setAttribute('data-empty', '— No subcategories available for the selected categories');
     return;
   }
   const selected = new Set(Array.isArray(preselected) ? preselected : asMultiList(preselected));
-  renderMultiPick(el, config, selected, null);
-  // expose the set on the element so saveQa can read it
+  renderMultiPick(el, {groups}, selected, null);
   el._selectedSet = selected;
 }
 
@@ -3684,12 +4290,13 @@ function saveQa(){
   const date    = document.getElementById('q-date').value;
   const score   = document.getElementById('q-score').value;
   const link    = document.getElementById('q-link').value.trim();
-  const catKey  = document.getElementById('q-cat').value;
+  const catArr    = readMultiPick(document.getElementById('q-cat-multi'));
+  const catKey    = joinMultiList(catArr); // stored as comma-separated for sheet readability
   const subcatArr = readMultiPick(document.getElementById('q-subcat-multi'));
-  const subcat  = joinMultiList(subcatArr); // stored as comma-separated for sheet readability
+  const subcat  = joinMultiList(subcatArr);
   const feedback= document.getElementById('q-feedback').value.trim();
-  if(!sid||!ticket||!date||score===''||!catKey||!feedback){
-    toast('Fill all required fields.',false); return;
+  if(!sid||!ticket||!date||score===''||!catArr.length||!feedback){
+    toast('Fill all required fields (at least one category).',false); return;
   }
   const sc = parseFloat(score);
   if(isNaN(sc) || sc<0 || sc>100){ toast('Score must be 0–100.',false); return; }
@@ -3757,7 +4364,7 @@ function deleteQa(id){
 function openQaAckModal(qaId){
   const q = db.qas.find(x=>x.id===qaId); if(!q) return;
   const s = SPECIALISTS.find(x=>x.id===q.specialistId);
-  const cat = QA_CATEGORIES.find(c=>c.key===q.categoryKey);
+  const cats = qaCategories(q);
   document.getElementById('qa-ack-id').value = qaId;
   document.getElementById('qa-ack-comment').value = q.ackComment || '';
   qaAckRating = q.ackRating || 0;
@@ -3768,7 +4375,7 @@ function openQaAckModal(qaId){
     <div style="font-family:'Inter',sans-serif;font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">Ticket #${esc(q.ticketId)}${s?` — ${s.name}`:''}</div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px">
       <span class="badge bg-gray" style="font-family:'Inter',sans-serif;font-weight:800;color:${scoreColor}">Score: ${q.score}/100</span>
-      <span class="badge ${cat?.autofail?'bg-red':'bg-purple'}">${esc(cat?.label||q.categoryKey)}</span>
+      ${cats.length ? cats.map(c=>`<span class="badge ${c.autofail?'bg-red':'bg-purple'}">${esc(c.label)}</span>`).join('') : `<span class="badge bg-purple">${esc(q.categoryKey||'—')}</span>`}
       ${asMultiList(q.subcategory).map(s=>`<span class="badge bg-gray">${esc(s)}</span>`).join('')}
     </div>
     ${q.reviewLink?`<div style="font-size:12px;margin-bottom:8px"><a href="${esc(q.reviewLink)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">🔗 Open review link</a></div>`:''}
@@ -3848,7 +4455,7 @@ function setQaDispute(qaId, newStatus){
 // Specialist disputes an existing QA they were graded on
 function openSpecDisputeModal(qaId){
   const q = db.qas.find(x=>x.id===qaId); if(!q){ toast('QA not found.', false); return; }
-  const cat = QA_CATEGORIES.find(c=>c.key===q.categoryKey);
+  const cats = qaCategories(q);
   const scoreColor = q.score>=90?'#34D399':q.score>=75?'#FCD34D':'#FCA5A5';
   document.getElementById('spec-dispute-id').value = qaId;
   document.getElementById('spec-dispute-reason').value = q.disputeReason || '';
@@ -3856,7 +4463,7 @@ function openSpecDisputeModal(qaId){
     <div style="font-family:'Inter',sans-serif;font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">Ticket #${esc(q.ticketId)} · ${fmt(q.date)}</div>
     <div style="display:flex;gap:7px;flex-wrap:wrap">
       <span class="badge bg-gray" style="font-family:'Inter',sans-serif;font-weight:800;color:${scoreColor}">Score: ${q.score}/100</span>
-      <span class="badge ${cat?.autofail?'bg-red':'bg-purple'}">${esc(cat?.label||q.categoryKey)}</span>
+      ${cats.length ? cats.map(c=>`<span class="badge ${c.autofail?'bg-red':'bg-purple'}">${esc(c.label)}</span>`).join('') : `<span class="badge bg-purple">${esc(q.categoryKey||'—')}</span>`}
       ${asMultiList(q.subcategory).map(s=>`<span class="badge bg-gray">${esc(s)}</span>`).join('')}
     </div>
     ${q.feedback?`<div style="margin-top:9px;padding:9px 11px;background:var(--surface);border-radius:7px;font-size:12px;color:var(--text2);line-height:1.55"><strong style="color:var(--accent);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">QA Feedback</strong>${esc(q.feedback)}</div>`:''}`;
@@ -3940,7 +4547,7 @@ function renderQaPage(){
   let list = [...db.qas].sort((a,b)=>b.date.localeCompare(a.date));
   if(sf)  list = list.filter(q=>q.specialistId===sf);
   if(stf) list = list.filter(q=>q.status===stf);
-  if(cf)  list = list.filter(q=>q.categoryKey===cf);
+  if(cf)  list = list.filter(q => asMultiList(q.categoryKey).map(migrateLegacyQaCategory).includes(cf));
   if(df){
     if(df==='any')          list = list.filter(q=>q.disputeStatus && q.disputeStatus!=='none');
     else if(df==='sla-breached') list = list.filter(q=>{const sla=disputeSla(q);return sla.open && sla.breached;});
@@ -4045,7 +4652,7 @@ function renderMyQas(){
 // ════════════════════════════════════════════════════════════
 function renderQaCard(q, showSpec, isAdmin, isSpecView){
   const s   = SPECIALISTS.find(x=>x.id===q.specialistId);
-  const cat = QA_CATEGORIES.find(c=>c.key===q.categoryKey);
+  const cats = qaCategories(q);
   const isPending = q.status==='pending';
   const canAck = isSpecView || (session?.role==='admin');
   const scoreColor = q.score==null ? 'var(--text3)' : (q.score>=90?'#34D399':q.score>=75?'#FCD34D':'#FCA5A5');
@@ -4070,7 +4677,7 @@ function renderQaCard(q, showSpec, isAdmin, isSpecView){
       <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
         <span class="badge ${isPending?'bg-amber':'bg-green'}">${isPending?'⏳ Pending':'✓ Acknowledged'}</span>
         ${q.score!=null?`<span class="badge bg-gray" style="font-family:'Inter',sans-serif;font-weight:800;color:${scoreColor}">${q.score}/100</span>`:''}
-        ${cat?`<span class="badge ${cat.autofail?'bg-red':'bg-purple'}">${esc(cat.label)}</span>`:''}
+        ${cats.map(c=>`<span class="badge ${c.autofail?'bg-red':'bg-purple'}">${esc(c.label)}</span>`).join('')}
         ${asMultiList(q.subcategory).map(s=>`<span class="badge bg-gray">${esc(s)}</span>`).join('')}
         ${disputeBadge}
         ${slaBadge}
@@ -4110,10 +4717,33 @@ function openSessionModal(specId){
   document.getElementById('s-recognition').value='';
   document.getElementById('s-followup').value='';
   ['s-wfm-sla-status','s-wfm-sla-note','s-wfm-adh-status','s-wfm-adh-note','s-wfm-tools-status','s-wfm-tools-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  // Reset lead-feedback fields too
+  ['s-lead-warroom-status','s-lead-warroom-note','s-lead-wabi-status','s-lead-wabi-note','s-lead-dsat-status','s-lead-dsat-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   sessMood=0;document.querySelectorAll('#session-modal .rb').forEach(b=>b.classList.remove('act'));
   _sessionTpCheckedIds = new Set();
-  refreshSessionTalkingPoints();
+  onSessionSpecChange();
   openModal('session-modal');
+  // Auto-refresh from cloud so talking points the specialist may have added
+  // recently appear immediately. We pull in the background and re-render the
+  // talking-points checklist if anything new comes in.
+  if(isCloudEnabled()){
+    cloudPull().then(cloud => {
+      hydrateFromCloud(cloud);
+      refreshSessionTalkingPoints();
+    }).catch(err => console.warn('Talking points refresh pull failed:', err));
+  }
+}
+
+// Combined handler — fires on spec dropdown change and on modal open.
+// Toggles the Lead Feedback panel for specialists with role 'lead' and
+// refreshes the talking-points checklist.
+function onSessionSpecChange(){
+  const sid = document.getElementById('s-spec').value;
+  const spec = SPECIALISTS.find(x=>x.id===sid);
+  const isLead = spec && spec.role === 'lead';
+  const leadWrap = document.getElementById('s-lead-feedback-wrap');
+  if(leadWrap) leadWrap.style.display = isLead ? '' : 'none';
+  refreshSessionTalkingPoints();
 }
 
 // Tracks which talking points the admin ticks off as discussed during the session
@@ -4187,6 +4817,13 @@ function saveSession(){
     wfmAdhNote:      document.getElementById('s-wfm-adh-note').value.trim(),
     wfmToolsStatus:  document.getElementById('s-wfm-tools-status').value || '',
     wfmToolsNote:    document.getElementById('s-wfm-tools-note').value.trim(),
+    // Lead-only feedback (War Room / Wabi / DSAT) — empty for non-leads
+    leadWarRoomStatus: document.getElementById('s-lead-warroom-status').value || '',
+    leadWarRoomNote:   document.getElementById('s-lead-warroom-note').value.trim(),
+    leadWabiStatus:    document.getElementById('s-lead-wabi-status').value || '',
+    leadWabiNote:      document.getElementById('s-lead-wabi-note').value.trim(),
+    leadDsatStatus:    document.getElementById('s-lead-dsat-status').value || '',
+    leadDsatNote:      document.getElementById('s-lead-dsat-note').value.trim(),
     createdAt:new Date().toISOString()
   };
   db.sessions.push(ses);
@@ -4224,6 +4861,61 @@ function deleteSession(id){
       _pendingSync = {tab:'Sessions', op:'delete', id};
       saveDB();toast('🗑 Deleted.');renderSessionsPage();
       if(currentSpec) renderSDSessions(currentSpec);
+    }
+  });
+}
+
+// ─── Lead Feedback (standalone entries) ──────────────────────────
+function openLeadFeedbackModal(specId){
+  document.getElementById('lf-spec-id').value = specId;
+  document.getElementById('lf-date').value = today();
+  document.getElementById('lf-type').value = 'wabi';
+  document.getElementById('lf-status').value = '';
+  document.getElementById('lf-note').value = '';
+  openModal('lead-feedback-modal');
+  setTimeout(()=>document.getElementById('lf-note').focus(), 80);
+}
+
+function saveLeadFeedback(){
+  const specialistId = document.getElementById('lf-spec-id').value;
+  const date = document.getElementById('lf-date').value;
+  const type = document.getElementById('lf-type').value;
+  const status = document.getElementById('lf-status').value || '';
+  const note = document.getElementById('lf-note').value.trim();
+  if(!specialistId || !date || !type || !note){
+    toast('Date, type and note are required.', false); return;
+  }
+  const entry = {
+    id: genId(),
+    specialistId,
+    date,
+    type,
+    status,
+    note,
+    createdAt: new Date().toISOString()
+  };
+  if(!Array.isArray(db.leadFeedback)) db.leadFeedback = [];
+  db.leadFeedback.push(entry);
+  _pendingSync = {tab:'LeadFeedback', op:'insert', row:entry};
+  saveDB();
+  closeModal('lead-feedback-modal');
+  toast('✅ Lead feedback added.');
+  if(currentSpec === specialistId) renderSDLeadFeedback(specialistId);
+}
+
+function deleteLeadFeedback(id){
+  const entry = (db.leadFeedback||[]).find(x=>x.id===id);
+  if(!entry) return;
+  confirmDialog({
+    title: 'Delete this feedback entry?',
+    message: `Delete this ${entry.type} feedback from ${fmt(entry.date)}? This cannot be undone.`,
+    okLabel: '🗑 Delete',
+    onOk: () => {
+      db.leadFeedback = db.leadFeedback.filter(x => x.id !== id);
+      _pendingSync = {tab:'LeadFeedback', op:'delete', id};
+      saveDB();
+      toast('🗑 Deleted.');
+      if(currentSpec) renderSDLeadFeedback(currentSpec);
     }
   });
 }
@@ -4703,13 +5395,37 @@ function downloadMonthIcs(){
 function upcomingAppointmentsFor(specId){
   if(!Array.isArray(db.appointments)) return [];
   const now = new Date();
-  return db.appointments
-    .filter(a => !specId || a.specialistId === specId)
+  // Coerce specId to string to match the values returned from the cloud (Sheets
+  // can convert numeric-looking IDs to numbers, so equality would fail).
+  const wanted = specId != null ? String(specId).trim() : '';
+  const results = db.appointments
+    .filter(a => {
+      if(wanted){
+        const aSid = a.specialistId != null ? String(a.specialistId).trim() : '';
+        if(aSid !== wanted) return false;
+      }
+      return true;
+    })
     .filter(a => {
       const dt = new Date((a.date||'')+'T'+(a.time||'00:00'));
-      return dt >= now;
+      return !isNaN(dt) && dt >= now;
     })
     .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+  // Diagnostic logging — helps catch sheet-side ID mismatches in production
+  if(specId && db.appointments.length && results.length === 0){
+    const sample = db.appointments.find(a => {
+      const aSid = a.specialistId != null ? String(a.specialistId).trim() : '';
+      return aSid === wanted;
+    });
+    if(!sample){
+      console.warn(`[Team Hub] No appointments found for specialist "${specId}". Appointments in cache:`,
+        db.appointments.map(a => `${a.specialistId}/${a.date}@${a.time}`).join(' | '));
+    } else {
+      console.warn(`[Team Hub] Specialist "${specId}" has appointments but none are in the future.`,
+        'Found:', `${sample.date}T${sample.time}`, 'Now:', now.toISOString());
+    }
+  }
+  return results;
 }
 
 function pointsForAppointment(apptId){
@@ -4732,6 +5448,96 @@ function renderMyUpcoming(){
   }
   el.innerHTML = list.map(a => renderUpcomingCard(a, /*specView*/true)).join('');
   updateMyUpcomingBadge();
+}
+
+// ════════════════════════════════════════════════════════════
+// MY FEEDBACK (specialist view, leads only)
+// ════════════════════════════════════════════════════════════
+function gatherFeedbackForSpec(sid){
+  const standalone = (db.leadFeedback||[]).filter(f => f.specialistId === sid)
+    .map(f => ({...f, _type:f.type, _date:f.date, _status:f.status, _note:f.note, _source:'standalone'}));
+  const fromSessions = (db.sessions||[])
+    .filter(s => s.specialistId === sid)
+    .flatMap(s => {
+      const items = [];
+      if(s.leadWarRoomStatus || (s.leadWarRoomNote||'').trim()) items.push({id:`${s.id}-warroom`, _type:'warroom', _date:s.date, _status:s.leadWarRoomStatus, _note:s.leadWarRoomNote, _source:'session', sessionId:s.id});
+      if(s.leadWabiStatus    || (s.leadWabiNote||'').trim())    items.push({id:`${s.id}-wabi`,    _type:'wabi',    _date:s.date, _status:s.leadWabiStatus,    _note:s.leadWabiNote,    _source:'session', sessionId:s.id});
+      if(s.leadDsatStatus    || (s.leadDsatNote||'').trim())    items.push({id:`${s.id}-dsat`,    _type:'dsat',    _date:s.date, _status:s.leadDsatStatus,    _note:s.leadDsatNote,    _source:'session', sessionId:s.id});
+      return items;
+    });
+  return [...standalone, ...fromSessions].sort((a,b) => (b._date||'').localeCompare(a._date||''));
+}
+
+function renderMyFeedback(){
+  const sid = session?.specId; if(!sid) return;
+  const all = gatherFeedbackForSpec(sid);
+  const filter = document.getElementById('my-fb-filter')?.value || '';
+  const list = filter ? all.filter(x => x._type === filter) : all;
+
+  // Stats
+  const counts = {warroom:0, wabi:0, dsat:0, action:0};
+  all.forEach(it => {
+    if(counts[it._type] != null) counts[it._type]++;
+    if(it._status === 'action') counts.action++;
+  });
+  const statsEl = document.getElementById('my-fb-stats');
+  if(statsEl){
+    statsEl.innerHTML = `
+      <div class="stat-card sc-blue"><div class="sl">Total Entries</div><div class="sv">${all.length}</div></div>
+      <div class="stat-card ${counts.action?'sc-red':'sc-green'}"><div class="sl">🚨 Action Needed</div><div class="sv">${counts.action}</div></div>
+      <div class="stat-card sc-purple"><div class="sl">🏛 War Room</div><div class="sv">${counts.warroom}</div></div>
+      <div class="stat-card sc-pink"><div class="sl">🐰 Wabi</div><div class="sv">${counts.wabi}</div></div>
+      <div class="stat-card sc-amber"><div class="sl">📉 DSAT</div><div class="sv">${counts.dsat}</div></div>`;
+  }
+
+  const typeMeta = {
+    warroom: {emoji:'🏛', label:'War Room'},
+    wabi:    {emoji:'🐰', label:'Wabi Feedback'},
+    dsat:    {emoji:'📉', label:'DSAT Feedback'}
+  };
+  const palette = {
+    good:    {bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.22)', color:'#059669',  emoji:'✓', label:'Strong'},
+    concern: {bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.25)', color:'#B45309',  emoji:'⚠', label:'Concern'},
+    action:  {bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  color:'#DC2626',  emoji:'🚨',label:'Action needed'}
+  };
+
+  document.getElementById('my-fb-list').innerHTML = list.length
+    ? list.map(it => {
+        const m = typeMeta[it._type] || {emoji:'•', label:it._type||''};
+        const p = palette[it._status] || {bg:'var(--surface)', border:'var(--border)', color:'var(--text2)', emoji:'—', label:'Not set'};
+        return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${p.color}">
+          <div style="display:flex;align-items:flex-start;gap:11px;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+                <span style="font-size:13px;font-weight:800;color:var(--text)">${m.emoji} ${esc(m.label)}</span>
+                <span style="font-size:11px;font-weight:700;color:${p.color};background:${p.bg};border:1px solid ${p.border};padding:2px 8px;border-radius:99px">${p.emoji} ${p.label}</span>
+                <span style="font-size:11px;color:var(--text3)">${fmt(it._date)}${it._source==='session'?' · from 1:1':' · standalone'}</span>
+              </div>
+              ${it._note ? `<div style="font-size:13px;color:var(--text2);line-height:1.6">${esc(it._note)}</div>` : '<div style="font-size:11px;color:var(--text3);font-style:italic">No note added.</div>'}
+            </div>
+          </div>
+        </div>`;
+      }).join('')
+    : `<div class="empty" style="padding:60px"><div class="ei">👑</div><p>No feedback ${filter?'of this type':'yet'}.<br><span style="font-size:11px;color:var(--text3);margin-top:6px;display:block">Your admin will log War Room, Wabi, and DSAT feedback here as it comes in.</span></p></div>`;
+  updateMyFeedbackBadge();
+}
+
+function updateMyFeedbackBadge(){
+  const badge = document.getElementById('my-feedback-badge');
+  if(!badge) return;
+  if(session?.role !== 'specialist'){ badge.style.display='none'; return; }
+  const sp = SPECIALISTS.find(x=>x.id===session.specId);
+  if(!sp || sp.role !== 'lead'){ badge.style.display='none'; return; }
+  // Count items that need attention (status='action') OR recent (last 7 days)
+  const items = gatherFeedbackForSpec(session.specId);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
+  const fresh = items.filter(it => {
+    if(it._status === 'action') return true;
+    if(!it._date) return false;
+    return new Date(it._date) >= cutoff;
+  }).length;
+  badge.style.display = fresh > 0 ? '' : 'none';
+  badge.textContent = fresh;
 }
 
 // Renders one appointment card with its talking points
@@ -4910,6 +5716,7 @@ function renderSesCard(s, showSpec, isAdmin){
         <div style="font-size:12px;color:var(--text2);line-height:1.65;background:var(--surface);border-radius:7px;padding:9px 11px">${esc(s.notes)}</div>
         ${s.actions?`<div style="font-size:11px;font-weight:700;color:var(--accent);margin-top:9px;text-transform:uppercase;letter-spacing:.06em">Action Items</div><div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.65">${esc(s.actions)}</div>`:''}
         ${renderWfmCallouts(s)}
+        ${renderLeadFeedback(s)}
         ${s.recognition?`<div style="margin-top:10px;padding:9px 12px;background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(236,72,153,.08));border:1px solid rgba(99,102,241,.18);border-radius:8px"><div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">🌟 Recognition</div><div style="font-size:12px;color:var(--text2);line-height:1.6">${esc(s.recognition)}</div></div>`:''}
         ${hasComments?`<div style="margin-top:10px;padding:10px 12px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.18);border-radius:8px"><div style="font-size:11px;font-weight:700;color:#10B981;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:flex;align-items:center;gap:6px">💬 ${sp?esc(sp.name.split(' ')[0]):'Specialist'}'s Comments${s.specialistCommentsDate?` <span style="color:var(--text3);font-weight:600;text-transform:none;letter-spacing:0">· ${fmt((s.specialistCommentsDate||'').slice(0,10))}</span>`:''}</div><div style="font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap">${esc(s.specialistComments)}</div></div>`:''}
         ${s.followup?`<div style="font-size:11px;color:var(--amber);margin-top:7px">📅 Follow-up: ${fmt(s.followup)}</div>`:''}
@@ -4942,6 +5749,35 @@ function renderWfmCallouts(s){
         return `<div style="background:${p.bg};border:1px solid ${p.border};border-radius:8px;padding:8px 10px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:${it.note?'4px':'0'}">
             <span style="font-size:11px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.04em">${esc(it.label)}</span>
+            <span style="font-size:10px;font-weight:700;color:${p.color}">${p.emoji} ${p.label}</span>
+          </div>
+          ${it.note?`<div style="font-size:11px;color:var(--text2);line-height:1.55">${esc(it.note)}</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+function renderLeadFeedback(s){
+  const items = [
+    {label:'War Room',       status:s.leadWarRoomStatus, note:s.leadWarRoomNote, emoji:'🏛'},
+    {label:'Wabi Feedback',  status:s.leadWabiStatus,    note:s.leadWabiNote,    emoji:'🐰'},
+    {label:'DSAT Feedback',  status:s.leadDsatStatus,    note:s.leadDsatNote,    emoji:'📉'}
+  ].filter(x => (x.status && x.status!=='') || (x.note && x.note.trim()));
+  if(!items.length) return '';
+  const palette = {
+    good:    {bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.22)', color:'#059669',  emoji:'✓', label:'Strong'},
+    concern: {bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.25)', color:'#B45309',  emoji:'⚠', label:'Concern'},
+    action:  {bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  color:'#DC2626',  emoji:'🚨',label:'Action needed'},
+    '':      {bg:'var(--surface)',         border:'var(--border)',         color:'var(--text2)', emoji:'—', label:'Not set'}
+  };
+  return `<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">👑 Lead Feedback</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:7px">
+      ${items.map(it => {
+        const p = palette[it.status||''] || palette[''];
+        return `<div style="background:${p.bg};border:1px solid ${p.border};border-radius:8px;padding:8px 10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:${it.note?'4px':'0'}">
+            <span style="font-size:11px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.04em">${it.emoji} ${esc(it.label)}</span>
             <span style="font-size:10px;font-weight:700;color:${p.color}">${p.emoji} ${p.label}</span>
           </div>
           ${it.note?`<div style="font-size:11px;color:var(--text2);line-height:1.55">${esc(it.note)}</div>`:''}
@@ -5141,16 +5977,38 @@ function computeFailurePatterns(specId, period){
   const myQas = db.qas.filter(q => (!specId || q.specialistId===specId) && inPeriod(q));
   const myDsats = db.dsats.filter(d => (!specId || d.specialistId===specId) && inPeriod(d));
 
-  // QA: category-level counts
+  // QA: category-level counts (a single QA can list multiple categories — count each one)
   const qaCategoryCounts = {};
   const qaSubcategoryCounts = {}; // keyed by "catKey :: subcat"
   myQas.forEach(q => {
-    const cat = migrateLegacyQaCategory(q.categoryKey);
-    if(!cat) return;
-    qaCategoryCounts[cat] = (qaCategoryCounts[cat] || 0) + 1;
-    asMultiList(q.subcategory).forEach(sub => {
-      const key = cat + ' :: ' + sub;
-      qaSubcategoryCounts[key] = (qaSubcategoryCounts[key] || 0) + 1;
+    const cats = asMultiList(q.categoryKey).map(migrateLegacyQaCategory).filter(Boolean);
+    if(!cats.length) return;
+    cats.forEach(cat => {
+      qaCategoryCounts[cat] = (qaCategoryCounts[cat] || 0) + 1;
+    });
+    // Subcategories are stored as a single comma-separated list and aren't tied
+    // to a specific parent category in storage. We attribute each subcategory to
+    // the parent category whose taxonomy contains it. If a subcategory matches
+    // multiple parents, it'll count under each (rare, but conservative).
+    const subs = asMultiList(q.subcategory);
+    subs.forEach(sub => {
+      let attributed = false;
+      cats.forEach(cat => {
+        const config = QA_SUBCATEGORIES[cat];
+        if(!config) return;
+        const flat = config.flat || (config.groups || []).flatMap(g => g.items);
+        if(flat.includes(sub)){
+          const key = cat + ' :: ' + sub;
+          qaSubcategoryCounts[key] = (qaSubcategoryCounts[key] || 0) + 1;
+          attributed = true;
+        }
+      });
+      if(!attributed){
+        // Subcategory doesn't match any selected category's taxonomy —
+        // attribute to the first listed category so it still shows somewhere.
+        const key = cats[0] + ' :: ' + sub;
+        qaSubcategoryCounts[key] = (qaSubcategoryCounts[key] || 0) + 1;
+      }
     });
   });
 
@@ -5255,7 +6113,13 @@ const zone=document.getElementById('csv-zone');
 if(zone){
   zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
   zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
-  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');const f=e.dataTransfer.files[0];if(f){const fi=document.getElementById('csv-file-input');const dt=new DataTransfer();dt.items.add(f);fi.files=dt.files;previewCSV(fi);}});
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');const f=e.dataTransfer.files[0];if(f){const fi=document.getElementById('csv-file-input');const dt=new DataTransfer();dt.items.add(f);fi.files=dt.files;previewMetricsFile(fi);}});
+}
+const qaZone = document.getElementById('qa-csv-zone');
+if(qaZone){
+  qaZone.addEventListener('dragover',e=>{e.preventDefault();qaZone.classList.add('drag');});
+  qaZone.addEventListener('dragleave',()=>qaZone.classList.remove('drag'));
+  qaZone.addEventListener('drop',e=>{e.preventDefault();qaZone.classList.remove('drag');const f=e.dataTransfer.files[0];if(f){const fi=document.getElementById('qa-csv-file-input');const dt=new DataTransfer();dt.items.add(f);fi.files=dt.files;previewQaFile(fi);}});
 }
 
 // Initialize the metrics period picker on app load
