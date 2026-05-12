@@ -583,20 +583,20 @@ textarea{resize:vertical;min-height:78px}
     <div class="ph"><div class="ph-left"><h1>Bulk Import</h1><p>Upload a CSV or XLSX file to bulk-load metrics or QA entries</p></div></div>
 
     <div class="tab-bar" style="margin-bottom:18px">
-      <button class="tab-btn active" data-imp-tab="metrics" onclick="switchImportTab('metrics')">📊 Metrics</button>
-      <button class="tab-btn" data-imp-tab="qas" onclick="switchImportTab('qas')">🎯 QA</button>
+      <button class="tab-btn active" data-imp-tab="weekly"  onclick="switchImportTab('weekly')">📊 Weekly Metrics</button>
+      <button class="tab-btn"        data-imp-tab="monthly" onclick="switchImportTab('monthly')">🗓 Monthly Metrics</button>
+      <button class="tab-btn"        data-imp-tab="qas"     onclick="switchImportTab('qas')">🎯 QA</button>
     </div>
 
-    <!-- ─────────── METRICS IMPORT ─────────── -->
-    <div class="imp-tab-content" id="imp-tab-metrics">
+    <!-- ─────────── WEEKLY METRICS IMPORT ─────────── -->
+    <div class="imp-tab-content" id="imp-tab-weekly">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">📊 Metrics Format</div><div class="card-sub">CSV or XLSX with a header row. Column names are case-insensitive.</div></div></div>
+        <div class="card-hd"><div><div class="card-title">📊 Weekly Metrics Format</div><div class="card-sub">CSV or XLSX with a header row. Each row is one specialist's week. <strong>The <code>date</code> column should be the Sunday of the week.</strong></div></div></div>
         <div class="tw">
           <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
           <tbody>
             <tr><td><code>specialist</code></td><td>Specialist Name</td><td>Candelaria Lucena</td><td style="color:var(--accent);font-weight:600">Required — must match name exactly</td></tr>
-            <tr><td><code>date</code></td><td>Anchor date</td><td>2026-05-10</td><td>YYYY-MM-DD · Sunday (weekly) or 1st of month (monthly)</td></tr>
-            <tr><td><code>periodType</code></td><td>Weekly / Monthly</td><td>weekly</td><td><code>weekly</code> or <code>monthly</code> (default: weekly)</td></tr>
+            <tr><td><code>date</code></td><td>Week of (Sunday)</td><td>2026-05-10</td><td style="color:var(--accent);font-weight:600">YYYY-MM-DD · must be a Sunday</td></tr>
             <tr><td><code>csat</code></td><td>CSAT %</td><td>87.5</td><td></td></tr>
             <tr><td><code>aht</code></td><td>AHT (min)</td><td>6.2</td><td></td></tr>
             <tr><td><code>tph</code></td><td>Tickets per hour</td><td>5.2</td><td></td></tr>
@@ -609,26 +609,71 @@ textarea{resize:vertical;min-height:78px}
             <tr><td><code>recognition</code></td><td>Recognition</td><td>Resolved tough case</td><td>Optional — shown on Recognition Wall</td></tr>
           </tbody></table>
         </div>
-        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate()">📥 Download blank template</button></div>
+        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate('weekly')">📥 Download weekly template</button></div>
       </div>
 
       <div class="card" style="margin-top:14px">
         <div class="card-hd"><div class="card-title">Upload File</div></div>
-        <label class="csv-zone" id="csv-zone" for="csv-file-input">
-          <input type="file" id="csv-file-input" accept=".csv,.xlsx,.xls,text/csv" onchange="previewMetricsFile(this)">
+        <label class="csv-zone" id="csv-zone-weekly" for="csv-file-weekly">
+          <input type="file" id="csv-file-weekly" accept=".csv,.xlsx,.xls,text/csv" onchange="previewMetricsFile(this,'weekly')">
           <div style="font-size:28px;margin-bottom:10px">📁</div>
           <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to select CSV or XLSX file</div>
           <div style="font-size:12px;color:var(--text3)">or drag and drop</div>
         </label>
-        <div id="csv-status" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
-        <div id="csv-preview-wrap" style="display:none;margin-top:14px">
+        <div id="csv-status-weekly" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+        <div id="csv-preview-wrap-weekly" style="display:none;margin-top:14px">
           <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Preview (first 8 rows)</div>
-          <div class="tw" id="csv-preview-table"></div>
+          <div class="tw" id="csv-preview-table-weekly"></div>
         </div>
         <div style="display:flex;gap:9px;margin-top:14px;align-items:center">
-          <button class="btn btn-primary" id="csv-import-btn" onclick="importCSV()" disabled>⬆️ Import Records</button>
-          <button class="btn btn-secondary btn-sm" onclick="clearCSVImport()">Clear</button>
-          <span id="csv-import-status" style="font-size:12px;color:var(--text3)"></span>
+          <button class="btn btn-primary" id="csv-import-btn-weekly" onclick="importCSV('weekly')" disabled>⬆️ Import Weekly Records</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearCSVImport('weekly')">Clear</button>
+          <span id="csv-import-status-weekly" style="font-size:12px;color:var(--text3)"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────── MONTHLY METRICS IMPORT ─────────── -->
+    <div class="imp-tab-content" id="imp-tab-monthly" style="display:none">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">🗓 Monthly Metrics Format</div><div class="card-sub">CSV or XLSX with a header row. Each row is one specialist's month. <strong>The <code>date</code> column should be the 1st of the month.</strong></div></div></div>
+        <div class="tw">
+          <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>specialist</code></td><td>Specialist Name</td><td>Candelaria Lucena</td><td style="color:var(--accent);font-weight:600">Required — must match name exactly</td></tr>
+            <tr><td><code>date</code></td><td>Month of (1st)</td><td>2026-05-01</td><td style="color:var(--accent);font-weight:600">YYYY-MM-DD · must be the 1st of the month</td></tr>
+            <tr><td><code>csat</code></td><td>CSAT %</td><td>85.4</td><td></td></tr>
+            <tr><td><code>aht</code></td><td>AHT (min)</td><td>6.5</td><td></td></tr>
+            <tr><td><code>tph</code></td><td>Tickets per hour</td><td>5.0</td><td></td></tr>
+            <tr><td><code>qa</code></td><td>QA Score %</td><td>89.8</td><td></td></tr>
+            <tr><td><code>tickets</code></td><td>Tickets Handled</td><td>510</td><td></td></tr>
+            <tr><td><code>dsats</code></td><td>DSATs</td><td>9</td><td></td></tr>
+            <tr><td><code>adherence</code></td><td>Adherence %</td><td>95.8</td><td></td></tr>
+            <tr><td><code>escalations</code></td><td>Escalations</td><td>3</td><td></td></tr>
+            <tr><td><code>notes</code></td><td>Notes</td><td>Strong May</td><td>Optional</td></tr>
+            <tr><td><code>recognition</code></td><td>Recognition</td><td>Owned the SLA dashboard</td><td>Optional — shown on Recognition Wall</td></tr>
+          </tbody></table>
+        </div>
+        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate('monthly')">📥 Download monthly template</button></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-hd"><div class="card-title">Upload File</div></div>
+        <label class="csv-zone" id="csv-zone-monthly" for="csv-file-monthly">
+          <input type="file" id="csv-file-monthly" accept=".csv,.xlsx,.xls,text/csv" onchange="previewMetricsFile(this,'monthly')">
+          <div style="font-size:28px;margin-bottom:10px">📁</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to select CSV or XLSX file</div>
+          <div style="font-size:12px;color:var(--text3)">or drag and drop</div>
+        </label>
+        <div id="csv-status-monthly" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+        <div id="csv-preview-wrap-monthly" style="display:none;margin-top:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Preview (first 8 rows)</div>
+          <div class="tw" id="csv-preview-table-monthly"></div>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:14px;align-items:center">
+          <button class="btn btn-primary" id="csv-import-btn-monthly" onclick="importCSV('monthly')" disabled>⬆️ Import Monthly Records</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearCSVImport('monthly')">Clear</button>
+          <span id="csv-import-status-monthly" style="font-size:12px;color:var(--text3)"></span>
         </div>
       </div>
     </div>
@@ -3178,13 +3223,15 @@ function renderMetricsPage(){
 // BULK IMPORT — Metrics + QA (CSV and XLSX)
 // ════════════════════════════════════════════════════════════
 
-let parsedCSVRows = [];     // Metrics rows parsed and validated
+// Holds parsed rows per period — weekly + monthly each have their own buffer
+const parsedCSVRows = { weekly: [], monthly: [] };
 let parsedQaRows  = [];     // QA rows parsed and validated
 
 function switchImportTab(tab){
   document.querySelectorAll('[data-imp-tab]').forEach(b => b.classList.toggle('active', b.dataset.impTab === tab));
-  document.getElementById('imp-tab-metrics').style.display = tab === 'metrics' ? '' : 'none';
-  document.getElementById('imp-tab-qas').style.display    = tab === 'qas'     ? '' : 'none';
+  document.getElementById('imp-tab-weekly').style.display  = tab === 'weekly'  ? '' : 'none';
+  document.getElementById('imp-tab-monthly').style.display = tab === 'monthly' ? '' : 'none';
+  document.getElementById('imp-tab-qas').style.display     = tab === 'qas'     ? '' : 'none';
 }
 
 // Read a file and resolve to an array of plain row objects (header → value).
@@ -3260,57 +3307,100 @@ function splitCSVLine(line){
 
 // ─────────── METRICS IMPORT ───────────
 
-async function previewMetricsFile(input){
-  parsedCSVRows=[];
-  document.getElementById('csv-import-btn').disabled=true;
-  document.getElementById('csv-status').style.display='none';
-  document.getElementById('csv-preview-wrap').style.display='none';
-  const file=input.files[0];if(!file)return;
-  const statusEl=document.getElementById('csv-status');
+async function previewMetricsFile(input, period){
+  period = period || 'weekly';
+  parsedCSVRows[period] = [];
+  document.getElementById(`csv-import-btn-${period}`).disabled = true;
+  document.getElementById(`csv-status-${period}`).style.display = 'none';
+  document.getElementById(`csv-preview-wrap-${period}`).style.display = 'none';
+  const file = input.files[0]; if(!file) return;
+  const statusEl = document.getElementById(`csv-status-${period}`);
+  let rows;
   try {
-    parsedCSVRows = await readSpreadsheetFile(file);
+    rows = await readSpreadsheetFile(file);
   } catch(err){
-    statusEl.textContent='❌ '+err.message;
-    statusEl.style.background='rgba(239,68,68,.1)';statusEl.style.color='#FCA5A5';statusEl.style.display='block';
+    statusEl.textContent = '❌ ' + err.message;
+    statusEl.style.background = 'rgba(239,68,68,.1)'; statusEl.style.color = '#FCA5A5'; statusEl.style.display = 'block';
     return;
   }
-  // Filter to non-empty rows
-  parsedCSVRows = parsedCSVRows.filter(r => Object.values(r).some(v => v !== ''));
-  const matched=parsedCSVRows.filter(r=>SPECIALISTS.find(s=>s.name.toLowerCase()===(r.specialist||'').toLowerCase())).length;
-  const unmatched = parsedCSVRows.length - matched;
-  let msg = `✅ Parsed ${parsedCSVRows.length} rows — ${matched} match specialists.`;
-  if(unmatched) msg += ` ⚠ ${unmatched} will be skipped (specialist name doesn't match).`;
-  statusEl.textContent=msg;
-  statusEl.style.background = unmatched ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)';
-  statusEl.style.color      = unmatched ? '#F59E0B' : '#34D399';
-  statusEl.style.display='block';
-  document.getElementById('csv-import-btn').disabled = matched === 0;
-  // preview
-  const keys=Object.keys(parsedCSVRows[0]||{});
-  const preview=parsedCSVRows.slice(0,8);
-  document.getElementById('csv-preview-table').innerHTML=`<table><thead><tr>${keys.map(k=>`<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${preview.map(r=>{
-    const matched = !!SPECIALISTS.find(s=>s.name.toLowerCase()===(r.specialist||'').toLowerCase());
-    return `<tr style="${matched?'':'opacity:.5;background:rgba(245,158,11,.05)'}">${keys.map(k=>`<td style="font-size:11px">${esc(r[k]||'')}</td>`).join('')}</tr>`;
+  rows = rows.filter(r => Object.values(r).some(v => v !== ''));
+  parsedCSVRows[period] = rows;
+
+  // Validate: specialist must match, date must be valid AND match period anchor
+  let matched = 0, unmatched = 0, badDate = 0;
+  const preview = rows.slice(0,8).map(r => {
+    const spec = SPECIALISTS.find(s => s.name.toLowerCase() === (r.specialist||'').toLowerCase());
+    let dateOk = true, dateMsg = '';
+    if(r.date){
+      const d = new Date(r.date);
+      if(isNaN(d)){ dateOk = false; dateMsg = 'invalid date'; }
+      else if(period === 'weekly' && d.getDay() !== 0){ dateOk = false; dateMsg = 'not a Sunday'; }
+      else if(period === 'monthly' && d.getDate() !== 1){ dateOk = false; dateMsg = 'not the 1st of the month'; }
+    }
+    if(!spec){ unmatched++; }
+    else if(!dateOk){ badDate++; }
+    else matched++;
+    return {row:r, spec, dateOk, dateMsg};
+  });
+
+  let msg = `✅ Parsed ${rows.length} rows.`;
+  const warnings = [];
+  if(unmatched) warnings.push(`${unmatched} specialist name(s) unmatched`);
+  if(badDate)   warnings.push(`${badDate} date(s) don't fit ${period} (need ${period==='weekly'?'Sunday':'1st of month'})`);
+  if(warnings.length) msg += ' ⚠ ' + warnings.join(', ') + ' — those rows will be skipped.';
+  else msg += ` All ${matched} ready to import.`;
+  statusEl.textContent = msg;
+  statusEl.style.background = warnings.length ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)';
+  statusEl.style.color      = warnings.length ? '#F59E0B' : '#34D399';
+  statusEl.style.display = 'block';
+
+  // Render preview with row-level status indicators
+  const keys = Object.keys(rows[0] || {});
+  const tableHtml = `<table><thead><tr>${keys.map(k=>`<th>${esc(k)}</th>`).join('')}<th>Status</th></tr></thead><tbody>${preview.map(p => {
+    const okClass = (p.spec && p.dateOk) ? '' : 'opacity:.55;background:rgba(245,158,11,.05)';
+    const status = !p.spec ? `<span style="color:#F59E0B;font-size:11px">⚠ specialist not found</span>`
+                 : !p.dateOk ? `<span style="color:#F59E0B;font-size:11px">⚠ ${esc(p.dateMsg)}</span>`
+                 : `<span style="color:#34D399;font-size:11px">✓ ok</span>`;
+    return `<tr style="${okClass}">${keys.map(k=>`<td style="font-size:11px">${esc(p.row[k]||'')}</td>`).join('')}<td>${status}</td></tr>`;
   }).join('')}</tbody></table>`;
-  document.getElementById('csv-preview-wrap').style.display='block';
+  document.getElementById(`csv-preview-table-${period}`).innerHTML = tableHtml;
+  document.getElementById(`csv-preview-wrap-${period}`).style.display = 'block';
+
+  // Count globally valid rows (not just preview) for the import button
+  const validCount = rows.filter(r => {
+    const sp = SPECIALISTS.find(s => s.name.toLowerCase() === (r.specialist||'').toLowerCase());
+    if(!sp) return false;
+    if(!r.date) return false;
+    const d = new Date(r.date);
+    if(isNaN(d)) return false;
+    if(period === 'weekly' && d.getDay() !== 0) return false;
+    if(period === 'monthly' && d.getDate() !== 1) return false;
+    return true;
+  }).length;
+  document.getElementById(`csv-import-btn-${period}`).disabled = validCount === 0;
 }
 
-function importCSV(){
-  if(!parsedCSVRows.length) return;
-  let imported=0, skipped=0;
+function importCSV(period){
+  period = period || 'weekly';
+  const rows = parsedCSVRows[period];
+  if(!rows || !rows.length) return;
+  let imported = 0, skipped = 0;
   const newEntries = [];
-  parsedCSVRows.forEach(row=>{
-    const spec=SPECIALISTS.find(s=>s.name.toLowerCase()===(row.specialist||'').toLowerCase());
-    if(!spec){skipped++;return;}
-    const date=row.date || today();
-    const periodType = (row.periodtype || row.periodType || 'weekly').toLowerCase() === 'monthly' ? 'monthly' : 'weekly';
-    const entry={
-      id:genId(),specialistId:spec.id,date,periodType,
-      csat:pf(row.csat),tph:pf(row.tph),aht:pf(row.aht),qa:pf(row.qa),
-      tickets:pi(row.tickets),dsats:pi(row.dsats),adherence:pf(row.adherence),
-      escalations:pi(row.escalations),notes:(row.notes||'').trim(),
-      recognition:(row.recognition||'').trim(),
-      createdAt:new Date().toISOString()
+  rows.forEach(row => {
+    const spec = SPECIALISTS.find(s => s.name.toLowerCase() === (row.specialist||'').toLowerCase());
+    if(!spec){ skipped++; return; }
+    if(!row.date){ skipped++; return; }
+    const d = new Date(row.date);
+    if(isNaN(d)){ skipped++; return; }
+    if(period === 'weekly'  && d.getDay() !== 0){ skipped++; return; }
+    if(period === 'monthly' && d.getDate() !== 1){ skipped++; return; }
+    const entry = {
+      id: genId(), specialistId: spec.id, date: row.date, periodType: period,
+      csat: pf(row.csat), tph: pf(row.tph), aht: pf(row.aht), qa: pf(row.qa),
+      tickets: pi(row.tickets), dsats: pi(row.dsats), adherence: pf(row.adherence),
+      escalations: pi(row.escalations), notes: (row.notes||'').trim(),
+      recognition: (row.recognition||'').trim(),
+      createdAt: new Date().toISOString()
     };
     db.metrics.push(entry);
     newEntries.push(entry);
@@ -3320,32 +3410,39 @@ function importCSV(){
   if(isCloudEnabled()){
     newEntries.forEach(entry => cloudPush({tab:'Metrics', op:'insert', row:entry}));
   }
-  document.getElementById('csv-import-status').textContent=`✅ ${imported} imported, ${skipped} skipped.${isCloudEnabled()?' Syncing to sheet…':''}`;
-  toast(`✅ Imported ${imported} metrics records!`);
-  parsedCSVRows=[];
-  document.getElementById('csv-import-btn').disabled=true;
+  document.getElementById(`csv-import-status-${period}`).textContent =
+    `✅ ${imported} imported, ${skipped} skipped.${isCloudEnabled()?' Syncing to sheet…':''}`;
+  toast(`✅ Imported ${imported} ${period} metrics!`);
+  parsedCSVRows[period] = [];
+  document.getElementById(`csv-import-btn-${period}`).disabled = true;
 }
 
-function clearCSVImport(){
-  parsedCSVRows=[];
-  document.getElementById('csv-file-input').value='';
-  document.getElementById('csv-status').style.display='none';
-  document.getElementById('csv-preview-wrap').style.display='none';
-  document.getElementById('csv-import-btn').disabled=true;
-  document.getElementById('csv-import-status').textContent='';
+function clearCSVImport(period){
+  period = period || 'weekly';
+  parsedCSVRows[period] = [];
+  document.getElementById(`csv-file-${period}`).value = '';
+  document.getElementById(`csv-status-${period}`).style.display = 'none';
+  document.getElementById(`csv-preview-wrap-${period}`).style.display = 'none';
+  document.getElementById(`csv-import-btn-${period}`).disabled = true;
+  document.getElementById(`csv-import-status-${period}`).textContent = '';
 }
 
-function downloadMetricsTemplate(){
-  const headers = ['specialist','date','periodType','csat','tph','qa','aht','tickets','dsats','adherence','escalations','notes','recognition'];
-  const sample = ['Candelaria Lucena','2026-05-10','weekly','87.5','5.2','91.5','6.2','124','2','96.0','1','Great week','Resolved tough case'];
+function downloadMetricsTemplate(period){
+  period = period || 'weekly';
+  // Note: no periodType column — it's enforced by which tab you upload to
+  const headers = ['specialist','date','csat','tph','qa','aht','tickets','dsats','adherence','escalations','notes','recognition'];
+  const exampleDate = period === 'monthly' ? '2026-05-01' : '2026-05-10';
+  const exampleNote = period === 'monthly' ? 'Strong May'  : 'Great week';
+  const exampleRec  = period === 'monthly' ? 'Owned the SLA dashboard' : 'Resolved tough case';
+  const sample  = ['Candelaria Lucena', exampleDate, '87.5','5.2','91.5','6.2','124','2','96.0','1', exampleNote, exampleRec];
   const csv = headers.join(',') + '\n' + sample.join(',') + '\n';
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'metrics-template.csv';
+  a.href = url; a.download = `${period}-metrics-template.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast('📥 Template downloaded.');
+  toast(`📥 ${period === 'weekly' ? 'Weekly' : 'Monthly'} template downloaded.`);
 }
 
 // ─────────── QA IMPORT ───────────
@@ -6234,13 +6331,20 @@ function renderFailurePatterns(containerEl, specId, period){
 // Close modals on backdrop click
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 
-// Drag-drop CSV
-const zone=document.getElementById('csv-zone');
-if(zone){
-  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
-  zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
-  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');const f=e.dataTransfer.files[0];if(f){const fi=document.getElementById('csv-file-input');const dt=new DataTransfer();dt.items.add(f);fi.files=dt.files;previewMetricsFile(fi);}});
-}
+// Drag-drop wiring for each metrics period + QA
+['weekly','monthly'].forEach(period => {
+  const zone = document.getElementById(`csv-zone-${period}`);
+  if(!zone) return;
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag');
+    const f = e.dataTransfer.files[0]; if(!f) return;
+    const fi = document.getElementById(`csv-file-${period}`);
+    const dt = new DataTransfer(); dt.items.add(f); fi.files = dt.files;
+    previewMetricsFile(fi, period);
+  });
+});
 const qaZone = document.getElementById('qa-csv-zone');
 if(qaZone){
   qaZone.addEventListener('dragover',e=>{e.preventDefault();qaZone.classList.add('drag');});
