@@ -1410,6 +1410,32 @@ textarea{resize:vertical;min-height:78px}
   </div>
 </div>
 
+<!-- ════════ MODAL: FEEDBACK ACKNOWLEDGE (lead acknowledging their feedback) ════════ -->
+<div class="modal-overlay" id="fb-ack-modal">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header"><span class="modal-title">Acknowledge Feedback</span><button class="modal-close" onclick="closeModal('fb-ack-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="fb-ack-key">
+      <div id="fb-ack-context" style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:18px"></div>
+      <div class="fg-grid">
+        <div class="fg full"><label>Your Status</label>
+          <select id="fb-ack-status">
+            <option value="">— Choose one</option>
+            <option value="working-on-it">🔨 Working on it</option>
+            <option value="disagree">⚠ Disagree</option>
+            <option value="resolved">✓ Resolved</option>
+          </select>
+        </div>
+        <div class="fg full"><label>Your Reply</label><textarea id="fb-ack-comment" placeholder="What's your take? What are you doing about it? Anything you want your admin to know…" style="min-height:120px"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('fb-ack-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFbAck()">💾 Save Reply</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════ MODAL: CONFIRM DIALOG ════════ -->
 <div class="modal-overlay" id="confirm-modal">
   <div class="modal" style="max-width:440px">
@@ -1723,7 +1749,7 @@ const SHEET_URL_KEY = 'teamhub_sheet_url';
 // specialists don't need to paste a URL on their device. The Settings → Cloud Sync
 // override is still available for testing.
 // ════════════════════════════════════════════════════════════
-const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwJJaosleAD9YM6RRgKn8YL-mEPLz8uhJqZJDZ3yqZuh_bJmooSG6kRwmQ_d7rVCffVmg/exec';   // ← paste your /exec URL here
+const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbz2z6AkIj1hqfScEvQERPpU9r8KTopbuSsO7yRrX2o8o1Y8OzkmVCdgzq7ZFHeah3sOtQ/exec';   // ← paste your /exec URL here
 
 // ════════════════════════════════════════════════════════════
 // CLOUD SYNC (Google Apps Script backend)
@@ -2917,6 +2943,12 @@ function renderSDLeadFeedback(sid){
     action:  {bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  color:'#DC2626',  emoji:'🚨',label:'Action needed'}
   };
 
+  const ackPalette = {
+    'working-on-it': {bg:'rgba(245,158,11,.1)', color:'#B45309', emoji:'🔨', label:'Working on it'},
+    'disagree':      {bg:'rgba(239,68,68,.1)',  color:'#DC2626', emoji:'⚠',  label:'Disagree'},
+    'resolved':      {bg:'rgba(16,185,129,.1)', color:'#059669', emoji:'✓',  label:'Resolved'}
+  };
+
   el.innerHTML = `
     <div class="card" style="margin-bottom:14px">
       <div class="card-hd">
@@ -2929,15 +2961,19 @@ function renderSDLeadFeedback(sid){
           const m = typeMeta[it._type] || {emoji:'•', label:it._type||''};
           const p = palette[it._status] || {bg:'var(--surface)', border:'var(--border)', color:'var(--text2)', emoji:'—', label:'Not set'};
           const isStandalone = it._source === 'standalone';
+          const ackP = ackPalette[it._ackStatus] || null;
+          const acked = !!(it._ackStatus || (it._ackComment||'').trim());
           return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${p.color}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:11px;flex-wrap:wrap">
               <div style="flex:1;min-width:200px">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
                   <span style="font-size:13px;font-weight:800;color:var(--text)">${m.emoji} ${esc(m.label)}</span>
                   <span style="font-size:11px;font-weight:700;color:${p.color};background:${p.bg};border:1px solid ${p.border};padding:2px 8px;border-radius:99px">${p.emoji} ${p.label}</span>
+                  ${ackP ? `<span style="font-size:11px;font-weight:700;color:${ackP.color};background:${ackP.bg};padding:2px 8px;border-radius:99px">${ackP.emoji} ${ackP.label}</span>` : (acked ? '<span class="badge bg-green">✓ Acknowledged</span>' : '<span class="badge bg-amber">⏳ Awaiting reply</span>')}
                   <span style="font-size:11px;color:var(--text3)">${fmt(it._date)}${isStandalone?' · standalone':' · from 1:1'}</span>
                 </div>
                 ${it._note ? `<div style="font-size:13px;color:var(--text2);line-height:1.6">${esc(it._note)}</div>` : '<div style="font-size:11px;color:var(--text3);font-style:italic">No note added.</div>'}
+                ${it._ackComment ? `<div style="margin-top:10px;padding:10px 12px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);border-radius:8px"><div style="font-size:10px;font-weight:800;color:#059669;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Specialist Reply${it._ackDate?' · '+fmt((it._ackDate||'').slice(0,10)):''}</div><div style="font-size:12px;color:var(--text2);line-height:1.55">${esc(it._ackComment)}</div></div>` : ''}
               </div>
               ${isStandalone ? `<button class="btn btn-danger btn-xs" onclick="deleteLeadFeedback('${it.id}')">✕</button>` : ''}
             </div>
@@ -5455,14 +5491,27 @@ function renderMyUpcoming(){
 // ════════════════════════════════════════════════════════════
 function gatherFeedbackForSpec(sid){
   const standalone = (db.leadFeedback||[]).filter(f => f.specialistId === sid)
-    .map(f => ({...f, _type:f.type, _date:f.date, _status:f.status, _note:f.note, _source:'standalone'}));
+    .map(f => ({
+      ...f,
+      _type:f.type, _date:f.date, _status:f.status, _note:f.note, _source:'standalone',
+      _ackStatus: f.ackStatus || '', _ackComment: f.ackComment || '', _ackDate: f.ackDate || ''
+    }));
   const fromSessions = (db.sessions||[])
     .filter(s => s.specialistId === sid)
     .flatMap(s => {
       const items = [];
-      if(s.leadWarRoomStatus || (s.leadWarRoomNote||'').trim()) items.push({id:`${s.id}-warroom`, _type:'warroom', _date:s.date, _status:s.leadWarRoomStatus, _note:s.leadWarRoomNote, _source:'session', sessionId:s.id});
-      if(s.leadWabiStatus    || (s.leadWabiNote||'').trim())    items.push({id:`${s.id}-wabi`,    _type:'wabi',    _date:s.date, _status:s.leadWabiStatus,    _note:s.leadWabiNote,    _source:'session', sessionId:s.id});
-      if(s.leadDsatStatus    || (s.leadDsatNote||'').trim())    items.push({id:`${s.id}-dsat`,    _type:'dsat',    _date:s.date, _status:s.leadDsatStatus,    _note:s.leadDsatNote,    _source:'session', sessionId:s.id});
+      if(s.leadWarRoomStatus || (s.leadWarRoomNote||'').trim()) items.push({
+        id:`${s.id}-warroom`, _type:'warroom', _date:s.date, _status:s.leadWarRoomStatus, _note:s.leadWarRoomNote, _source:'session', sessionId:s.id,
+        _ackStatus: s.leadWarRoomAckStatus || '', _ackComment: s.leadWarRoomAckComment || '', _ackDate: s.leadWarRoomAckDate || ''
+      });
+      if(s.leadWabiStatus    || (s.leadWabiNote||'').trim())    items.push({
+        id:`${s.id}-wabi`,    _type:'wabi',    _date:s.date, _status:s.leadWabiStatus,    _note:s.leadWabiNote,    _source:'session', sessionId:s.id,
+        _ackStatus: s.leadWabiAckStatus || '', _ackComment: s.leadWabiAckComment || '', _ackDate: s.leadWabiAckDate || ''
+      });
+      if(s.leadDsatStatus    || (s.leadDsatNote||'').trim())    items.push({
+        id:`${s.id}-dsat`,    _type:'dsat',    _date:s.date, _status:s.leadDsatStatus,    _note:s.leadDsatNote,    _source:'session', sessionId:s.id,
+        _ackStatus: s.leadDsatAckStatus || '', _ackComment: s.leadDsatAckComment || '', _ackDate: s.leadDsatAckDate || ''
+      });
       return items;
     });
   return [...standalone, ...fromSessions].sort((a,b) => (b._date||'').localeCompare(a._date||''));
@@ -5501,19 +5550,34 @@ function renderMyFeedback(){
     action:  {bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  color:'#DC2626',  emoji:'🚨',label:'Action needed'}
   };
 
+  const ackPalette = {
+    'working-on-it': {bg:'rgba(245,158,11,.1)', color:'#B45309', emoji:'🔨', label:'Working on it'},
+    'disagree':      {bg:'rgba(239,68,68,.1)',  color:'#DC2626', emoji:'⚠',  label:'Disagree'},
+    'resolved':      {bg:'rgba(16,185,129,.1)', color:'#059669', emoji:'✓',  label:'Resolved'}
+  };
+
   document.getElementById('my-fb-list').innerHTML = list.length
     ? list.map(it => {
         const m = typeMeta[it._type] || {emoji:'•', label:it._type||''};
         const p = palette[it._status] || {bg:'var(--surface)', border:'var(--border)', color:'var(--text2)', emoji:'—', label:'Not set'};
+        const acked = !!(it._ackStatus || (it._ackComment||'').trim());
+        const ackP = ackPalette[it._ackStatus] || null;
+        // Encode the item key so we can pass it to the modal
+        const key = `${it._source}|${it.id}`;
         return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${p.color}">
           <div style="display:flex;align-items:flex-start;gap:11px;flex-wrap:wrap">
             <div style="flex:1;min-width:200px">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
                 <span style="font-size:13px;font-weight:800;color:var(--text)">${m.emoji} ${esc(m.label)}</span>
                 <span style="font-size:11px;font-weight:700;color:${p.color};background:${p.bg};border:1px solid ${p.border};padding:2px 8px;border-radius:99px">${p.emoji} ${p.label}</span>
+                ${ackP ? `<span style="font-size:11px;font-weight:700;color:${ackP.color};background:${ackP.bg};padding:2px 8px;border-radius:99px">${ackP.emoji} ${ackP.label}</span>` : ''}
                 <span style="font-size:11px;color:var(--text3)">${fmt(it._date)}${it._source==='session'?' · from 1:1':' · standalone'}</span>
               </div>
               ${it._note ? `<div style="font-size:13px;color:var(--text2);line-height:1.6">${esc(it._note)}</div>` : '<div style="font-size:11px;color:var(--text3);font-style:italic">No note added.</div>'}
+              ${acked && it._ackComment ? `<div style="margin-top:10px;padding:10px 12px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);border-radius:8px"><div style="font-size:10px;font-weight:800;color:#059669;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Your Reply${it._ackDate?' · '+fmt((it._ackDate||'').slice(0,10)):''}</div><div style="font-size:12px;color:var(--text2);line-height:1.55">${esc(it._ackComment)}</div></div>` : ''}
+              <div style="margin-top:10px">
+                <button class="btn ${acked?'btn-secondary':'btn-warn'} btn-sm" onclick="openFbAckModal('${key}')">${acked?'✏ Edit reply':'✓ Acknowledge & reply'}</button>
+              </div>
             </div>
           </div>
         </div>`;
@@ -5528,16 +5592,78 @@ function updateMyFeedbackBadge(){
   if(session?.role !== 'specialist'){ badge.style.display='none'; return; }
   const sp = SPECIALISTS.find(x=>x.id===session.specId);
   if(!sp || sp.role !== 'lead'){ badge.style.display='none'; return; }
-  // Count items that need attention (status='action') OR recent (last 7 days)
+  // Badge counts UN-acknowledged items that need attention OR are from the last 7 days
   const items = gatherFeedbackForSpec(session.specId);
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
   const fresh = items.filter(it => {
+    const acked = !!(it._ackStatus || (it._ackComment||'').trim());
+    if(acked) return false;
     if(it._status === 'action') return true;
     if(!it._date) return false;
     return new Date(it._date) >= cutoff;
   }).length;
   badge.style.display = fresh > 0 ? '' : 'none';
   badge.textContent = fresh;
+}
+
+// ─── Feedback Acknowledgment (specialist replies to lead feedback) ───
+// The "key" combines source + id: "standalone|<fb-id>" or "session|<sess-id>-<type>"
+function openFbAckModal(key){
+  const sid = session?.specId; if(!sid) return;
+  const item = gatherFeedbackForSpec(sid).find(it => `${it._source}|${it.id}` === key);
+  if(!item){ toast('Feedback entry not found.', false); return; }
+  const typeMeta = {
+    warroom: {emoji:'🏛', label:'War Room'},
+    wabi:    {emoji:'🐰', label:'Wabi Feedback'},
+    dsat:    {emoji:'📉', label:'DSAT Feedback'}
+  };
+  const m = typeMeta[item._type] || {emoji:'•', label:item._type||''};
+  document.getElementById('fb-ack-key').value = key;
+  document.getElementById('fb-ack-status').value = item._ackStatus || '';
+  document.getElementById('fb-ack-comment').value = item._ackComment || '';
+  document.getElementById('fb-ack-context').innerHTML = `
+    <div style="font-family:'Inter',sans-serif;font-size:13px;font-weight:800;color:var(--text);margin-bottom:6px">${m.emoji} ${esc(m.label)} · ${fmt(item._date)}</div>
+    ${item._note ? `<div style="font-size:12px;color:var(--text2);line-height:1.6">${esc(item._note)}</div>` : '<div style="font-size:11px;color:var(--text3);font-style:italic">No note added.</div>'}`;
+  openModal('fb-ack-modal');
+  setTimeout(()=>document.getElementById('fb-ack-comment').focus(), 80);
+}
+
+function saveFbAck(){
+  const key = document.getElementById('fb-ack-key').value;
+  const ackStatus = document.getElementById('fb-ack-status').value || '';
+  const ackComment = document.getElementById('fb-ack-comment').value.trim();
+  if(!ackStatus && !ackComment){
+    toast('Pick a status or write a reply (or both).', false); return;
+  }
+  const ackDate = new Date().toISOString();
+  const [source, rest] = key.split('|');
+  if(source === 'standalone'){
+    const entry = (db.leadFeedback||[]).find(x => x.id === rest);
+    if(!entry){ toast('Entry not found.', false); return; }
+    entry.ackStatus = ackStatus;
+    entry.ackComment = ackComment;
+    entry.ackDate = ackDate;
+    _pendingSync = {tab:'LeadFeedback', op:'update', row:entry};
+    saveDB();
+  } else if(source === 'session'){
+    // rest is "<sessionId>-<type>"
+    const lastDash = rest.lastIndexOf('-');
+    const sessId = rest.slice(0, lastDash);
+    const type   = rest.slice(lastDash + 1); // warroom | wabi | dsat
+    const sess = (db.sessions||[]).find(x => x.id === sessId);
+    if(!sess){ toast('Session not found.', false); return; }
+    const prefix = type === 'warroom' ? 'leadWarRoom' : type === 'wabi' ? 'leadWabi' : 'leadDsat';
+    sess[prefix+'AckStatus']  = ackStatus;
+    sess[prefix+'AckComment'] = ackComment;
+    sess[prefix+'AckDate']    = ackDate;
+    _pendingSync = {tab:'Sessions', op:'update', row:sess};
+    saveDB();
+  } else {
+    toast('Unknown feedback source.', false); return;
+  }
+  closeModal('fb-ack-modal');
+  toast(ackStatus === 'resolved' ? '✓ Marked as resolved.' : '✅ Reply saved.');
+  renderMyFeedback();
 }
 
 // Renders one appointment card with its talking points
