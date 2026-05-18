@@ -785,7 +785,13 @@ textarea{resize:vertical;min-height:78px}
       <div class="card"><div class="card-hd"><div class="card-title">Trend Over Time</div></div><div class="chart-wrap-lg"><canvas id="chart-an-trend"></canvas></div></div>
       <div class="card"><div class="card-hd"><div class="card-title">Specialist Comparison</div></div><div class="chart-wrap-lg"><canvas id="chart-an-compare"></canvas></div></div>
     </div>
-    <div class="card"><div class="card-hd"><div class="card-title">Leaderboard</div></div><div class="tw" id="an-leaderboard"></div></div>
+    <div class="card">
+      <div class="card-hd" style="align-items:center;flex-wrap:wrap;gap:10px">
+        <div><div class="card-title">🏆 Leaderboard</div><div class="card-sub" id="an-lb-sub">Ranked by CSAT · TPH · QA</div></div>
+        <select id="an-lb-period" onchange="onPeriodFilterChange('an-lb-period', renderAnalyticsLeaderboard)" style="font-size:12px;width:auto;padding:7px 11px"></select>
+      </div>
+      <div class="tw" id="an-leaderboard"></div>
+    </div>
     <div class="card" style="margin-top:18px">
       <div class="card-hd" style="align-items:center;flex-wrap:wrap;gap:10px">
         <div><div class="card-title">📊 Failure Patterns</div><div class="card-sub">Where the team (or one specialist) is losing the most points</div></div>
@@ -3961,14 +3967,81 @@ function renderAnalytics(){
   });
   if(ctx2) charts['chart-an-compare']=new Chart(ctx2,{type:'bar',data:{labels:specAvgs.map(x=>x.name),datasets:[{label:'Avg '+def.label,data:specAvgs.map(x=>x.avg),backgroundColor:colors,borderRadius:6,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:false,grid:{color:'rgba(15,23,42,.06)'},ticks:{color:'#94A3B8',font:{size:11}}},x:{grid:{display:false},ticks:{color:'#94A3B8',font:{size:11}}}}}});
 
-  // leaderboard
-  const lb=SPECIALISTS.map(s=>{
-    const sv=db.metrics.filter(m=>m.specialistId===s.id);
-    return{s,csat:avg(sv,'csat'),qa:avg(sv,'qa'),aht:avg(sv,'aht'),adh:avg(sv,'adherence'),ct:sv.length};
-  }).sort((a,b)=>(b.csat||0)-(a.csat||0));
-  document.getElementById('an-leaderboard').innerHTML=`<table><thead><tr><th>#</th><th>Specialist</th><th>CSAT</th><th>QA</th><th>AHT</th><th>Adherence</th><th>Entries</th></tr></thead><tbody>${lb.map((row,i)=>`<tr><td style="font-family:'Inter',sans-serif;font-weight:800;color:${i===0?'#FCD34D':i===1?'#94A3B8':i===2?'#C4A36A':'var(--text3)'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td><td><div style="display:flex;align-items:center;gap:7px">${avatarHTML(row.s,22,9,6)}<span style="font-size:12px;font-weight:600">${row.s.name}</span></div></td><td>${scoreCell(row.csat?.toFixed(1),80,true,'%')}</td><td>${scoreCell(row.qa?.toFixed(1),85,true,'%')}</td><td>${row.aht?row.aht.toFixed(1)+' min':'—'}</td><td>${row.adh?row.adh.toFixed(1)+'%':'—'}</td><td>${row.ct}</td></tr>`).join('')}</tbody></table>`;
+  // leaderboard — its own function so the period filter can re-render in isolation
+  renderAnalyticsLeaderboard();
   renderAnalyticsFailurePatterns();
   renderDsatResponsibility();
+}
+
+function renderAnalyticsLeaderboard(){
+  const el = document.getElementById('an-leaderboard');
+  if(!el) return;
+  const period = document.getElementById('an-lb-period')?.value || 'this-month';
+  // Filter metrics by selected period
+  const allMetrics = filterByPeriod(db.metrics || [], period, 'an-lb-period');
+
+  // Build per-specialist averages from the filtered set
+  const lb = SPECIALISTS.map(s => {
+    const sv = allMetrics.filter(m => m.specialistId === s.id);
+    return {
+      s,
+      csat: avg(sv,'csat'),
+      tph:  avg(sv,'tph'),
+      qa:   avg(sv,'qa'),
+      ct:   sv.length
+    };
+  });
+
+  // Combined composite score: same weighting as the Performance Ranking
+  // (CSAT 40% / TPH 40% / QA 20%, scaled against targets, capped at 1.5×)
+  const composite = (r) => {
+    const c = r.csat != null ? Math.min(r.csat / RANK_TARGETS.csat, RANK_CAP) : null;
+    const t = r.tph  != null ? Math.min(r.tph  / RANK_TARGETS.tph,  RANK_CAP) : null;
+    const q = r.qa   != null ? Math.min(r.qa   / RANK_TARGETS.qa,   RANK_CAP) : null;
+    if(c == null && t == null && q == null) return null;
+    // Use only the dimensions we have, re-weighting proportionally
+    let total = 0, weight = 0;
+    if(c != null){ total += c * RANK_WEIGHTS.csat; weight += RANK_WEIGHTS.csat; }
+    if(t != null){ total += t * RANK_WEIGHTS.tph;  weight += RANK_WEIGHTS.tph;  }
+    if(q != null){ total += q * RANK_WEIGHTS.qa;   weight += RANK_WEIGHTS.qa;   }
+    return weight ? (total / weight) * 100 : null;
+  };
+  lb.forEach(r => r.score = composite(r));
+
+  // Sort: rows with a score first (high to low), then no-data rows
+  lb.sort((a, b) => {
+    if(a.score == null && b.score == null) return 0;
+    if(a.score == null) return 1;
+    if(b.score == null) return -1;
+    return b.score - a.score;
+  });
+
+  // Update subtitle with the period label
+  const sub = document.getElementById('an-lb-sub');
+  if(sub) sub.textContent = `${periodLabelFor('an-lb-period')} · Composite = CSAT 40% + TPH 40% + QA 20%`;
+
+  // Render table
+  if(!lb.some(r => r.ct > 0)){
+    el.innerHTML = `<div class="empty" style="padding:32px"><div class="ei">📊</div><p>No metric entries in this period.</p></div>`;
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>#</th><th>Specialist</th><th>Score</th><th>CSAT</th><th>TPH</th><th>QA</th><th>Entries</th></tr></thead>
+    <tbody>${lb.map((row, i) => {
+      const isRanked = row.score != null;
+      const medalColor = i===0 ? '#FCD34D' : i===1 ? '#94A3B8' : i===2 ? '#C4A36A' : 'var(--text3)';
+      const medal     = isRanked ? (i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)) : '—';
+      return `<tr style="cursor:pointer" onclick="navTo('spec-detail','${row.s.id}')">
+        <td style="font-family:'Inter',sans-serif;font-weight:800;color:${medalColor}">${medal}</td>
+        <td><div style="display:flex;align-items:center;gap:7px">${avatarHTML(row.s,22,9,6)}<span style="font-size:12px;font-weight:600">${row.s.name}</span></div></td>
+        <td style="font-family:'Inter',sans-serif;font-weight:800;color:var(--accent)">${row.score != null ? row.score.toFixed(1) : '—'}</td>
+        <td>${row.csat != null ? scoreCell(row.csat.toFixed(1), 80, true, '%') : '<span style="color:var(--text3)">—</span>'}</td>
+        <td>${row.tph  != null ? scoreCell(row.tph.toFixed(1),  5,  true, '')  : '<span style="color:var(--text3)">—</span>'}</td>
+        <td>${row.qa   != null ? scoreCell(row.qa.toFixed(1),   85, true, '%') : '<span style="color:var(--text3)">—</span>'}</td>
+        <td style="color:var(--text3);font-size:11px">${row.ct}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
 }
 
 function renderAnalyticsFailurePatterns(){
@@ -7039,7 +7112,7 @@ if(qaZone){
 initMetricsPeriodPicker();
 
 // Initialize all standard period filters with the unified set of options
-['dash-period','sd-fp-period','an-fp-period','an-resp-period'].forEach(id => {
+['dash-period','sd-fp-period','an-fp-period','an-resp-period','an-lb-period'].forEach(id => {
   const el = document.getElementById(id);
   if(el && !el.innerHTML.trim()) el.innerHTML = periodFilterOptions('this-month');
 });
