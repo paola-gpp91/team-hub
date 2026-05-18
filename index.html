@@ -2051,9 +2051,14 @@ function hydrateFromCloud(cloud){
 
 function coerceNumeric(r){
   const out = {...r};
-  ['csat','tph','aht','qa','tickets','dsats','adherence','escalations'].forEach(k=>{
-    if(out[k]!=null && out[k]!=='') out[k] = +out[k];
-    else delete out[k];
+  ['csat','tph','aht','qa','tickets','dsats','adherence','escalations','goodSurveys','badSurveys','totalSurveys','iqs'].forEach(k=>{
+    if(out[k]!=null && out[k]!=='') {
+      const n = +out[k];
+      if(!isNaN(n)) out[k] = n;
+      else delete out[k];
+    } else {
+      delete out[k];
+    }
   });
   return out;
 }
@@ -6610,7 +6615,17 @@ function fmt(d){if(!d)return'—';const[y,m,day]=d.slice(0,10).split('-');return
 function today(){return new Date().toISOString().slice(0,10);}
 function pf(v){const n=parseFloat(v);return isNaN(n)?undefined:n;}
 function pi(v){const n=parseInt(v);return isNaN(n)?undefined:n;}
-function avg(arr,key){const v=arr.map(r=>r[key]).filter(x=>x!=null&&x!==undefined);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;}
+function avg(arr,key){
+  // Coerce every value to a number — Sheets sometimes returns numeric cells as
+  // strings, and empty cells as ''. Both would corrupt a reduce-sum if not handled.
+  const v = arr.map(r => {
+    const raw = r[key];
+    if(raw == null || raw === '') return null;
+    const n = typeof raw === 'number' ? raw : parseFloat(raw);
+    return isNaN(n) ? null : n;
+  }).filter(x => x != null);
+  return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null;
+}
 function getLatest(sid){return[...db.metrics.filter(m=>m.specialistId===sid)].sort((a,b)=>b.date.localeCompare(a.date))[0]||null;}
 function getPrev(sid){return[...db.metrics.filter(m=>m.specialistId===sid)].sort((a,b)=>b.date.localeCompare(a.date))[1]||null;}
 function filterByPeriod(arr,period,filterId){
