@@ -423,11 +423,7 @@ textarea{resize:vertical;min-height:78px}
     <div class="ph">
       <div class="ph-left"><h1>Dashboard</h1><p>Team performance at a glance</p></div>
       <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
-        <select id="dash-period" onchange="renderDashboard()" style="font-size:12px;width:auto;padding:7px 11px">
-          <option value="all">All Time</option>
-          <option value="month" selected>This Month</option>
-          <option value="week">This Week</option>
-        </select>
+        <select id="dash-period" onchange="onPeriodFilterChange('dash-period', renderDashboard)" style="font-size:12px;width:auto;padding:7px 11px"></select>
         <button class="btn btn-primary btn-sm" onclick="navTo('metrics')">+ Record Metrics</button>
       </div>
     </div>
@@ -437,9 +433,17 @@ textarea{resize:vertical;min-height:78px}
     <div class="card" style="margin-bottom:18px">
       <div class="card-hd" style="align-items:center">
         <div><div class="card-title">🏆 Performance Ranking</div><div class="card-sub" id="rank-sub">Weighted score based on CSAT, TPH, QA</div></div>
-        <div class="tab-bar" style="background:var(--surface2);padding:3px;border-radius:8px;margin:0">
-          <button class="tab-btn active" id="rank-tab-week"  onclick="setRankMode('week')">This Week</button>
-          <button class="tab-btn"        id="rank-tab-month" onclick="setRankMode('month')">This Month</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div class="tab-bar" style="background:var(--surface2);padding:3px;border-radius:8px;margin:0;flex-wrap:wrap">
+            <button class="tab-btn active" id="rank-engine-simple"  onclick="setRankEngine('simple')">📈 Simple</button>
+            <button class="tab-btn"        id="rank-engine-quart"   onclick="setRankEngine('quart')">📊 Quartilization</button>
+          </div>
+          <div class="tab-bar" style="background:var(--surface2);padding:3px;border-radius:8px;margin:0;flex-wrap:wrap">
+            <button class="tab-btn active" id="rank-tab-week"       onclick="setRankMode('week')">This Week</button>
+            <button class="tab-btn"        id="rank-tab-last-week"  onclick="setRankMode('last-week')">Last Week</button>
+            <button class="tab-btn"        id="rank-tab-month"      onclick="setRankMode('month')">Month</button>
+          </div>
+          <select id="rank-month-picker" onchange="onRankMonthChange()" style="display:none;font-size:12px;width:auto;padding:7px 11px"></select>
         </div>
       </div>
       <div id="rank-podium" style="margin-top:12px"></div>
@@ -511,11 +515,7 @@ textarea{resize:vertical;min-height:78px}
       <div class="card" style="margin-top:15px">
         <div class="card-hd" style="align-items:center;flex-wrap:wrap;gap:10px">
           <div><div class="card-title">📊 Failure Patterns</div><div class="card-sub">Where this specialist is losing points most often</div></div>
-          <select id="sd-fp-period" onchange="renderSDFailurePatterns()" style="font-size:12px;width:auto;padding:7px 11px">
-            <option value="month" selected>This Month</option>
-            <option value="week">This Week</option>
-            <option value="all">All Time</option>
-          </select>
+          <select id="sd-fp-period" onchange="onPeriodFilterChange('sd-fp-period', renderSDFailurePatterns)" style="font-size:12px;width:auto;padding:7px 11px"></select>
         </div>
         <div id="sd-fp-body"></div>
       </div>
@@ -583,75 +583,113 @@ textarea{resize:vertical;min-height:78px}
     <div class="ph"><div class="ph-left"><h1>Bulk Import</h1><p>Upload a CSV or XLSX file to bulk-load metrics or QA entries</p></div></div>
 
     <div class="tab-bar" style="margin-bottom:18px">
-      <button class="tab-btn active" data-imp-tab="weekly"  onclick="switchImportTab('weekly')">📊 Weekly Metrics</button>
-      <button class="tab-btn"        data-imp-tab="monthly" onclick="switchImportTab('monthly')">🗓 Monthly Metrics</button>
+      <button class="tab-btn active" data-imp-tab="tph"     onclick="switchImportTab('tph')">⚡ TPH (Weekly)</button>
+      <button class="tab-btn"        data-imp-tab="csat"    onclick="switchImportTab('csat')">💬 CSAT (Weekly)</button>
+      <button class="tab-btn"        data-imp-tab="monthly" onclick="switchImportTab('monthly')">🗓 Monthly</button>
       <button class="tab-btn"        data-imp-tab="qas"     onclick="switchImportTab('qas')">🎯 QA</button>
     </div>
 
-    <!-- ─────────── WEEKLY METRICS IMPORT ─────────── -->
-    <div class="imp-tab-content" id="imp-tab-weekly">
+    <!-- ─────────── TPH WEEKLY IMPORT ─────────── -->
+    <div class="imp-tab-content" id="imp-tab-tph">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">📊 Weekly Metrics Format</div><div class="card-sub">CSV or XLSX with a header row. Each row is one specialist's week. <strong>The <code>date</code> column should be the Sunday of the week.</strong></div></div></div>
+        <div class="card-hd"><div><div class="card-title">⚡ TPH (Weekly) Format</div><div class="card-sub">Tickets-per-hour data, one row per specialist per week. Imports match specialists by <strong>email</strong>.</div></div></div>
         <div class="tw">
           <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
           <tbody>
-            <tr><td><code>specialist</code></td><td>Specialist Name</td><td>Candelaria Lucena</td><td style="color:var(--accent);font-weight:600">Required — must match name exactly</td></tr>
-            <tr><td><code>date</code></td><td>Week of (Sunday)</td><td>2026-05-10</td><td style="color:var(--accent);font-weight:600">YYYY-MM-DD · must be a Sunday</td></tr>
-            <tr><td><code>csat</code></td><td>CSAT %</td><td>87.5</td><td></td></tr>
+            <tr><td><code>email</code></td><td>Specialist Email</td><td>candelaria@cookunity.com</td><td style="color:var(--accent);font-weight:600">Required — must match a specialist's email</td></tr>
+            <tr><td><code>tph</code></td><td>Tickets per Hour</td><td>5.2</td><td></td></tr>
             <tr><td><code>aht</code></td><td>AHT (min)</td><td>6.2</td><td></td></tr>
-            <tr><td><code>tph</code></td><td>Tickets per hour</td><td>5.2</td><td></td></tr>
-            <tr><td><code>qa</code></td><td>QA Score %</td><td>91.5</td><td></td></tr>
-            <tr><td><code>tickets</code></td><td>Tickets Handled</td><td>124</td><td></td></tr>
-            <tr><td><code>dsats</code></td><td>DSATs</td><td>2</td><td></td></tr>
-            <tr><td><code>adherence</code></td><td>Adherence %</td><td>96.0</td><td></td></tr>
-            <tr><td><code>escalations</code></td><td>Escalations</td><td>1</td><td></td></tr>
-            <tr><td><code>notes</code></td><td>Notes</td><td>Great week</td><td>Optional</td></tr>
-            <tr><td><code>recognition</code></td><td>Recognition</td><td>Resolved tough case</td><td>Optional — shown on Recognition Wall</td></tr>
+            <tr><td><code>tickets</code></td><td>Tickets Completed</td><td>124</td><td></td></tr>
+            <tr><td><code>week</code></td><td>Week Number</td><td>19</td><td style="color:var(--accent);font-weight:600">Required · 1–52 (converted to that week's Sunday)</td></tr>
+            <tr><td><code>year</code></td><td>Year</td><td>2026</td><td>Optional · defaults to current year</td></tr>
           </tbody></table>
         </div>
-        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate('weekly')">📥 Download weekly template</button></div>
+        <div style="margin-top:14px;padding:11px 14px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.18);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.55"><strong>💡 Merging:</strong> If you've already imported CSAT for this week, the TPH values merge into the same weekly row. Importing TPH twice for the same specialist+week updates the existing values.</div>
+        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate('tph')">📥 Download TPH template</button></div>
       </div>
 
       <div class="card" style="margin-top:14px">
         <div class="card-hd"><div class="card-title">Upload File</div></div>
-        <label class="csv-zone" id="csv-zone-weekly" for="csv-file-weekly">
-          <input type="file" id="csv-file-weekly" accept=".csv,.xlsx,.xls,text/csv" onchange="previewMetricsFile(this,'weekly')">
+        <label class="csv-zone" id="csv-zone-tph" for="csv-file-tph">
+          <input type="file" id="csv-file-tph" accept=".csv,.xlsx,.xls,text/csv" onchange="previewMetricsFile(this,'tph')">
           <div style="font-size:28px;margin-bottom:10px">📁</div>
           <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to select CSV or XLSX file</div>
           <div style="font-size:12px;color:var(--text3)">or drag and drop</div>
         </label>
-        <div id="csv-status-weekly" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
-        <div id="csv-preview-wrap-weekly" style="display:none;margin-top:14px">
+        <div id="csv-status-tph" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+        <div id="csv-preview-wrap-tph" style="display:none;margin-top:14px">
           <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Preview (first 8 rows)</div>
-          <div class="tw" id="csv-preview-table-weekly"></div>
+          <div class="tw" id="csv-preview-table-tph"></div>
         </div>
         <div style="display:flex;gap:9px;margin-top:14px;align-items:center">
-          <button class="btn btn-primary" id="csv-import-btn-weekly" onclick="importCSV('weekly')" disabled>⬆️ Import Weekly Records</button>
-          <button class="btn btn-secondary btn-sm" onclick="clearCSVImport('weekly')">Clear</button>
-          <span id="csv-import-status-weekly" style="font-size:12px;color:var(--text3)"></span>
+          <button class="btn btn-primary" id="csv-import-btn-tph" onclick="importCSV('tph')" disabled>⬆️ Import TPH Records</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearCSVImport('tph')">Clear</button>
+          <span id="csv-import-status-tph" style="font-size:12px;color:var(--text3)"></span>
         </div>
       </div>
     </div>
 
-    <!-- ─────────── MONTHLY METRICS IMPORT ─────────── -->
+    <!-- ─────────── CSAT WEEKLY IMPORT ─────────── -->
+    <div class="imp-tab-content" id="imp-tab-csat" style="display:none">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">💬 CSAT (Weekly) Format</div><div class="card-sub">CSAT scores + survey counts, one row per specialist per week. Imports match specialists by <strong>email</strong>.</div></div></div>
+        <div class="tw">
+          <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>email</code></td><td>Specialist Email</td><td>candelaria@cookunity.com</td><td style="color:var(--accent);font-weight:600">Required — must match a specialist's email</td></tr>
+            <tr><td><code>csat</code></td><td>CSAT %</td><td>87.5</td><td></td></tr>
+            <tr><td><code>goodSurveys</code></td><td>Good Surveys</td><td>34</td><td></td></tr>
+            <tr><td><code>badSurveys</code></td><td>Bad Surveys</td><td>4</td><td></td></tr>
+            <tr><td><code>totalSurveys</code></td><td>Total Surveys</td><td>38</td><td></td></tr>
+            <tr><td><code>week</code></td><td>Week Number</td><td>19</td><td style="color:var(--accent);font-weight:600">Required · 1–52</td></tr>
+            <tr><td><code>year</code></td><td>Year</td><td>2026</td><td>Optional · defaults to current year</td></tr>
+          </tbody></table>
+        </div>
+        <div style="margin-top:14px;padding:11px 14px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.18);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.55"><strong>💡 Merging:</strong> If you've already imported TPH for this week, the CSAT values merge into the same weekly row. Importing CSAT twice for the same specialist+week updates the existing values.</div>
+        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate('csat')">📥 Download CSAT template</button></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-hd"><div class="card-title">Upload File</div></div>
+        <label class="csv-zone" id="csv-zone-csat" for="csv-file-csat">
+          <input type="file" id="csv-file-csat" accept=".csv,.xlsx,.xls,text/csv" onchange="previewMetricsFile(this,'csat')">
+          <div style="font-size:28px;margin-bottom:10px">📁</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to select CSV or XLSX file</div>
+          <div style="font-size:12px;color:var(--text3)">or drag and drop</div>
+        </label>
+        <div id="csv-status-csat" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+        <div id="csv-preview-wrap-csat" style="display:none;margin-top:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Preview (first 8 rows)</div>
+          <div class="tw" id="csv-preview-table-csat"></div>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:14px;align-items:center">
+          <button class="btn btn-primary" id="csv-import-btn-csat" onclick="importCSV('csat')" disabled>⬆️ Import CSAT Records</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearCSVImport('csat')">Clear</button>
+          <span id="csv-import-status-csat" style="font-size:12px;color:var(--text3)"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────── MONTHLY IMPORT ─────────── -->
     <div class="imp-tab-content" id="imp-tab-monthly" style="display:none">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">🗓 Monthly Metrics Format</div><div class="card-sub">CSV or XLSX with a header row. Each row is one specialist's month. <strong>The <code>date</code> column should be the 1st of the month.</strong></div></div></div>
+        <div class="card-hd"><div><div class="card-title">🗓 Monthly Metrics Format</div><div class="card-sub">Full monthly summary, one row per specialist per month. Imports match specialists by <strong>name</strong>.</div></div></div>
         <div class="tw">
           <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
           <tbody>
             <tr><td><code>specialist</code></td><td>Specialist Name</td><td>Candelaria Lucena</td><td style="color:var(--accent);font-weight:600">Required — must match name exactly</td></tr>
-            <tr><td><code>date</code></td><td>Month of (1st)</td><td>2026-05-01</td><td style="color:var(--accent);font-weight:600">YYYY-MM-DD · must be the 1st of the month</td></tr>
-            <tr><td><code>csat</code></td><td>CSAT %</td><td>85.4</td><td></td></tr>
+            <tr><td><code>month</code></td><td>Month (1–12)</td><td>5</td><td style="color:var(--accent);font-weight:600">Required</td></tr>
+            <tr><td><code>year</code></td><td>Year</td><td>2026</td><td>Optional · defaults to current year</td></tr>
+            <tr><td><code>csat</code></td><td>CSAT Monthly %</td><td>85.4</td><td></td></tr>
+            <tr><td><code>goodSurveys</code></td><td>Good Surveys</td><td>136</td><td></td></tr>
+            <tr><td><code>badSurveys</code></td><td>Bad Surveys</td><td>18</td><td></td></tr>
+            <tr><td><code>totalSurveys</code></td><td>Total Surveys</td><td>154</td><td></td></tr>
+            <tr><td><code>iqs</code></td><td>IQS Monthly %</td><td>91.2</td><td></td></tr>
+            <tr><td><code>tickets</code></td><td>Total Tickets</td><td>510</td><td></td></tr>
             <tr><td><code>aht</code></td><td>AHT (min)</td><td>6.5</td><td></td></tr>
-            <tr><td><code>tph</code></td><td>Tickets per hour</td><td>5.0</td><td></td></tr>
-            <tr><td><code>qa</code></td><td>QA Score %</td><td>89.8</td><td></td></tr>
-            <tr><td><code>tickets</code></td><td>Tickets Handled</td><td>510</td><td></td></tr>
-            <tr><td><code>dsats</code></td><td>DSATs</td><td>9</td><td></td></tr>
-            <tr><td><code>adherence</code></td><td>Adherence %</td><td>95.8</td><td></td></tr>
-            <tr><td><code>escalations</code></td><td>Escalations</td><td>3</td><td></td></tr>
+            <tr><td><code>tph</code></td><td>TPH Monthly</td><td>5.0</td><td></td></tr>
             <tr><td><code>notes</code></td><td>Notes</td><td>Strong May</td><td>Optional</td></tr>
-            <tr><td><code>recognition</code></td><td>Recognition</td><td>Owned the SLA dashboard</td><td>Optional — shown on Recognition Wall</td></tr>
+            <tr><td><code>recognition</code></td><td>Recognition</td><td>Owned the SLA dashboard</td><td>Optional</td></tr>
           </tbody></table>
         </div>
         <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate('monthly')">📥 Download monthly template</button></div>
@@ -677,6 +715,7 @@ textarea{resize:vertical;min-height:78px}
         </div>
       </div>
     </div>
+
 
     <!-- ─────────── QA IMPORT ─────────── -->
     <div class="imp-tab-content" id="imp-tab-qas" style="display:none">
@@ -754,14 +793,18 @@ textarea{resize:vertical;min-height:78px}
           <select id="an-fp-spec" onchange="renderAnalyticsFailurePatterns()" style="font-size:12px;width:auto;padding:7px 11px">
             <option value="">Whole Team</option>
           </select>
-          <select id="an-fp-period" onchange="renderAnalyticsFailurePatterns()" style="font-size:12px;width:auto;padding:7px 11px">
-            <option value="month" selected>This Month</option>
-            <option value="week">This Week</option>
-            <option value="all">All Time</option>
-          </select>
+          <select id="an-fp-period" onchange="onPeriodFilterChange('an-fp-period', renderAnalyticsFailurePatterns)" style="font-size:12px;width:auto;padding:7px 11px"></select>
         </div>
       </div>
       <div id="an-fp-body"></div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card-hd" style="align-items:center;flex-wrap:wrap;gap:10px">
+        <div><div class="card-title">🎯 DSAT Responsibility</div><div class="card-sub">Agent-related vs not — by specialist and team-wide</div></div>
+        <select id="an-resp-period" onchange="onPeriodFilterChange('an-resp-period', renderDsatResponsibility)" style="font-size:12px;width:auto;padding:7px 11px"></select>
+      </div>
+      <div id="an-resp-body"></div>
     </div>
   </div>
 
@@ -1036,6 +1079,14 @@ textarea{resize:vertical;min-height:78px}
         </div>
         <div class="fg"><label>Preventable?</label><select id="d-prev"><option value="YES">YES</option><option value="NO">NO</option></select></div>
         <div class="fg"><label>Resolved?</label><select id="d-res"><option value="YES">YES</option><option value="NO">NO</option></select></div>
+        <div class="fg full"><label>Responsibility</label>
+          <select id="d-resp">
+            <option value="">— Choose…</option>
+            <option value="agent">🔴 Agent-Related</option>
+            <option value="not-agent">🟢 Not Agent-Related</option>
+          </select>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.5">Use this to flag whether the agent could have prevented this DSAT, or whether it was outside their control (system/process/customer).</div>
+        </div>
         <div class="fg full"><label>Supporting Details *</label><textarea id="d-details" placeholder="Context about what happened…"></textarea></div>
         <div class="fg full"><label>Coaching Feedback (shown to specialist)</label><textarea id="d-feedback" placeholder="What feedback was delivered to the agent…"></textarea></div>
       </div>
@@ -1482,6 +1533,25 @@ textarea{resize:vertical;min-height:78px}
 </div>
 
 <!-- ════════ MODAL: CONFIRM DIALOG ════════ -->
+<!-- ════════ MODAL: PERSONALIZED PERIOD RANGE ════════ -->
+<div class="modal-overlay" id="personalized-period-modal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><span class="modal-title">📅 Pick a Date Range</span><button class="modal-close" onclick="closeModal('personalized-period-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="pp-filter-id">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.55">Choose the start and end dates for this filter. Both dates are inclusive.</div>
+      <div class="fg-grid">
+        <div class="fg"><label>From</label><input type="date" id="pp-from"></div>
+        <div class="fg"><label>To</label><input type="date" id="pp-to"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('personalized-period-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePersonalizedPeriod()">Apply</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="confirm-modal">
   <div class="modal" style="max-width:440px">
     <div class="modal-header"><span class="modal-title" id="confirm-title">Are you sure?</span><button class="modal-close" onclick="confirmCancel()">✕</button></div>
@@ -1794,7 +1864,7 @@ const SHEET_URL_KEY = 'teamhub_sheet_url';
 // specialists don't need to paste a URL on their device. The Settings → Cloud Sync
 // override is still available for testing.
 // ════════════════════════════════════════════════════════════
-const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbz2z6AkIj1hqfScEvQERPpU9r8KTopbuSsO7yRrX2o8o1Y8OzkmVCdgzq7ZFHeah3sOtQ/exec';   // ← paste your /exec URL here
+const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbz3ZVewtZtXNWmVFNzPCGuyeCC85aQQ9YF-FiFJnkS8IgBbkQOXtwI8fpqxF2OlcPCMGg/exec';   // ← paste your /exec URL here
 
 // ════════════════════════════════════════════════════════════
 // CLOUD SYNC (Google Apps Script backend)
@@ -2625,15 +2695,15 @@ function saveSpecProfile(){
 // DASHBOARD
 // ════════════════════════════════════════════════════════════
 function renderDashboard(){
-  const period = document.getElementById('dash-period')?.value||'month';
+  const period = document.getElementById('dash-period')?.value || 'this-month';
   const all = db.metrics;
-  const filt = filterByPeriod(all, period);
+  const filt = filterByPeriod(all, period, 'dash-period');
 
   const avgCsat = avg(filt,'csat');
   const avgQa   = avg(filt,'qa');
   const totalTk = filt.reduce((a,r)=>a+(+r.tickets||0),0);
   const pendingD= db.dsats.filter(d=>d.status==='pending').length;
-  const sesCt   = filterByPeriod(db.sessions, period).length;
+  const sesCt   = filterByPeriod(db.sessions, period, 'dash-period').length;
 
   document.getElementById('dash-stats').innerHTML = `
     <div class="stat-card sc-blue"><div class="sl">Avg CSAT</div><div class="sv">${avgCsat?avgCsat.toFixed(1)+'%':'—'}</div><div class="ss">Team avg</div></div>
@@ -2678,23 +2748,88 @@ function renderDashboard(){
 // RANKING DISPLAY
 // ════════════════════════════════════════════════════════════
 let _rankMode = 'week';
+let _rankEngine = 'simple'; // 'simple' or 'quart'
+
+function setRankEngine(engine){
+  _rankEngine = engine;
+  ['simple','quart'].forEach(e => {
+    const btn = document.getElementById('rank-engine-' + e);
+    if(btn) btn.classList.toggle('active', engine === e);
+  });
+  renderRanking();
+}
+// Currently selected month for the Month tab: 'YYYY-MM' string or '' for "this month"
+let _rankMonth = '';
+
 function setRankMode(mode){
   _rankMode = mode;
-  document.getElementById('rank-tab-week').classList.toggle('active',  mode==='week');
-  document.getElementById('rank-tab-month').classList.toggle('active', mode==='month');
+  ['week','last-week','month'].forEach(m => {
+    const btn = document.getElementById('rank-tab-' + m);
+    if(btn) btn.classList.toggle('active', mode === m);
+  });
+  const picker = document.getElementById('rank-month-picker');
+  if(picker){
+    if(mode === 'month'){
+      buildRankMonthPicker();
+      picker.style.display = '';
+    } else {
+      picker.style.display = 'none';
+    }
+  }
   renderRanking();
+}
+
+function onRankMonthChange(){
+  _rankMonth = document.getElementById('rank-month-picker').value || '';
+  renderRanking();
+}
+
+// Build the month dropdown: "This Month" + every YYYY-MM in db.metrics, descending.
+function buildRankMonthPicker(){
+  const picker = document.getElementById('rank-month-picker');
+  if(!picker) return;
+  const now = new Date();
+  const currentYM = now.toISOString().slice(0,7);
+  // Collect all YYYY-MM values from monthly metrics (and any non-monthly with valid dates as fallback)
+  const monthSet = new Set();
+  (db.metrics || []).forEach(m => {
+    const ym = (m.date||'').slice(0,7);
+    if(/^\d{4}-\d{2}$/.test(ym)) monthSet.add(ym);
+  });
+  monthSet.add(currentYM); // ensure current month always present
+  // Sort descending
+  const months = Array.from(monthSet).sort().reverse();
+  const fmtYm = ym => {
+    const [y, m] = ym.split('-').map(Number);
+    return new Date(y, m-1, 1).toLocaleDateString(undefined, {month:'long', year:'numeric'});
+  };
+  let html = `<option value="">This Month (${fmtYm(currentYM)})</option>`;
+  months.forEach(ym => {
+    if(ym === currentYM) return; // already in "This Month" option
+    html += `<option value="${ym}">${fmtYm(ym)}</option>`;
+  });
+  picker.innerHTML = html;
+  picker.value = _rankMonth || '';
 }
 
 function rankPeriodLabel(mode){
   const now = new Date();
   if(mode==='week') return isoWeekStr(now).replace('-W',' · Week ');
-  return now.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  if(mode==='last-week'){
+    const lw = new Date(now); lw.setDate(lw.getDate() - 7);
+    return isoWeekStr(lw).replace('-W',' · Week ');
+  }
+  // month
+  const ym = _rankMonth || now.toISOString().slice(0,7);
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m-1, 1).toLocaleDateString(undefined,{month:'long',year:'numeric'});
 }
 
 function renderRanking(){
+  if(_rankEngine === 'quart') return renderRankingQuart();
   const {ranked, incomplete} = computeRanking(_rankMode);
   document.getElementById('rank-sub').textContent =
-    `${rankPeriodLabel(_rankMode)} · CSAT 40% · TPH 40% · QA 20% · Targets: ${RANK_TARGETS.csat}% / ${RANK_TARGETS.tph} / ${RANK_TARGETS.qa}%`;
+    `${rankPeriodLabel(_rankMode)} · Simple score · CSAT 40% · TPH 40% · QA 20% · Targets: ${RANK_TARGETS.csat}% / ${RANK_TARGETS.tph} / ${RANK_TARGETS.qa}%`;
 
   // Podium for top 3
   const podiumEl = document.getElementById('rank-podium');
@@ -2746,6 +2881,72 @@ function renderRanking(){
   if(incomplete.length){
     incEl.innerHTML = `<div style="margin-top:14px;padding:11px 13px;background:var(--surface2);border:1px dashed var(--border2);border-radius:10px">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">⚠ Not yet ranked — needs all 3 metrics</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        ${incomplete.map(x=>`<span class="badge bg-gray" title="Missing: ${x.missing.join(', ')}" style="display:inline-flex;align-items:center;gap:5px">${avatarHTML(x.spec,16,7,4)} ${esc(x.spec.name.split(' ')[0])} · missing ${x.missing.join(', ')}</span>`).join('')}
+      </div>
+    </div>`;
+  } else {
+    incEl.innerHTML = '';
+  }
+}
+
+// Renders the quartilization view — uses team-relative min-max normalization,
+// quartile assignment, below-target flags, and coaching frequency.
+function renderRankingQuart(){
+  const {ranked, incomplete} = computeQuartilization(_rankMode);
+  document.getElementById('rank-sub').textContent =
+    `${rankPeriodLabel(_rankMode)} · Quartilization · Composite = TPH 40% + CSAT 40% + IQS 20% (min-max normalized) · Targets: TPH ${RANK_TARGETS.tph} / CSAT ${RANK_TARGETS.csat}% / IQS ${RANK_TARGETS.qa}%`;
+
+  // Quartile color helper
+  const qColor = q => q==='Q1' ? '#10B981' : q==='Q2' ? '#3B82F6' : q==='Q3' ? '#F59E0B' : '#EF4444';
+  const qBg    = q => q==='Q1' ? 'rgba(16,185,129,.08)' : q==='Q2' ? 'rgba(59,130,246,.08)' : q==='Q3' ? 'rgba(245,158,11,.08)' : 'rgba(239,68,68,.08)';
+
+  // Hide the regular podium and show a quartile summary instead
+  const podiumEl = document.getElementById('rank-podium');
+  if(!ranked.length){
+    podiumEl.innerHTML = `<div class="empty" style="padding:32px"><div class="ei">📊</div><p>Not enough complete data to run quartilization for ${rankPeriodLabel(_rankMode).toLowerCase()} yet.</p></div>`;
+  } else {
+    const buckets = {Q1:0, Q2:0, Q3:0, Q4:0};
+    ranked.forEach(r => buckets[r.quartile]++);
+    podiumEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+      ${['Q1','Q2','Q3','Q4'].map(q => `<div style="background:${qBg(q)};border:1px solid ${qColor(q)}33;border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:11px;font-weight:800;color:${qColor(q)};text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">${q}</div>
+        <div style="font-size:24px;font-weight:800;color:var(--text);font-family:'Inter',sans-serif">${buckets[q]}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${q==='Q1'?'Top 25%':q==='Q4'?'Bottom 25%':q==='Q2'?'26–50%':'51–75%'}</div>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  // Render the full table
+  const flag = b => b ? '<span style="color:#EF4444;font-weight:800">✗</span>' : '<span style="color:#10B981;font-weight:800">✓</span>';
+  const valCell = (val, target, isBelow) => `<div style="font-family:'Inter',sans-serif;font-weight:700">${val.toFixed(1)}${target>20?'%':''}</div><div style="font-size:10px;color:var(--text3)">${flag(isBelow)} ${isBelow ? `${(target - val).toFixed(1)} below` : 'above'} target</div>`;
+  const tableEl = document.getElementById('rank-table');
+  if(ranked.length){
+    tableEl.innerHTML = `<div class="tw"><table>
+      <thead><tr>
+        <th>#</th><th>Specialist</th><th>Quartile</th><th>Composite</th>
+        <th>TPH (40%)</th><th>CSAT (40%)</th><th>IQS (20%)</th><th>Coaching</th>
+      </tr></thead>
+      <tbody>${ranked.map((r,i)=>`<tr style="cursor:pointer" onclick="navTo('spec-detail','${r.spec.id}')">
+        <td style="font-weight:800;color:var(--text3)">${i+1}</td>
+        <td><div style="display:flex;align-items:center;gap:7px">${avatarHTML(r.spec,24,10,6)}<span style="font-size:12px;font-weight:600">${esc(r.spec.name)}</span></div></td>
+        <td><span style="background:${qBg(r.quartile)};color:${qColor(r.quartile)};border:1px solid ${qColor(r.quartile)}55;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:800">${r.quartile}</span></td>
+        <td style="font-family:'Inter',sans-serif;font-weight:800;color:var(--accent)">${(r.composite*100).toFixed(1)}</td>
+        <td>${valCell(r.tph, RANK_TARGETS.tph, r.tphBelow)}</td>
+        <td>${valCell(r.csat, RANK_TARGETS.csat, r.csatBelow)}</td>
+        <td>${valCell(r.qa, RANK_TARGETS.qa, r.qaBelow)}</td>
+        <td>${r.coaching ? `<div style="font-size:12px;font-weight:700;color:${r.coaching.color}">${r.coaching.emoji} ${esc(r.coaching.label)}</div><div style="font-size:10px;color:var(--text3)">${esc(r.coaching.note)}</div>` : '<span style="color:var(--text3)">—</span>'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } else {
+    tableEl.innerHTML = '';
+  }
+
+  // Incomplete
+  const incEl = document.getElementById('rank-incomplete');
+  if(incomplete.length){
+    incEl.innerHTML = `<div style="margin-top:14px;padding:11px 13px;background:var(--surface2);border:1px dashed var(--border2);border-radius:10px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">⚠ Not yet quartilized — needs all 3 KPIs</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap">
         ${incomplete.map(x=>`<span class="badge bg-gray" title="Missing: ${x.missing.join(', ')}" style="display:inline-flex;align-items:center;gap:5px">${avatarHTML(x.spec,16,7,4)} ${esc(x.spec.name.split(' ')[0])} · missing ${x.missing.join(', ')}</span>`).join('')}
       </div>
@@ -2956,8 +3157,8 @@ function renderSDOverview(sid){
 
 function renderSDFailurePatterns(){
   if(!currentSpec) return;
-  const period = document.getElementById('sd-fp-period')?.value || 'month';
-  renderFailurePatterns(document.getElementById('sd-fp-body'), currentSpec, period);
+  const period = document.getElementById('sd-fp-period')?.value || 'this-month';
+  renderFailurePatterns(document.getElementById('sd-fp-body'), currentSpec, period, 'sd-fp-period');
 }
 
 function renderSDDsats(sid){
@@ -3223,15 +3424,41 @@ function renderMetricsPage(){
 // BULK IMPORT — Metrics + QA (CSV and XLSX)
 // ════════════════════════════════════════════════════════════
 
-// Holds parsed rows per period — weekly + monthly each have their own buffer
-const parsedCSVRows = { weekly: [], monthly: [] };
+// Holds parsed rows per period — TPH, CSAT, and Monthly each have their own buffer
+const parsedCSVRows = { tph: [], csat: [], monthly: [] };
 let parsedQaRows  = [];     // QA rows parsed and validated
 
 function switchImportTab(tab){
   document.querySelectorAll('[data-imp-tab]').forEach(b => b.classList.toggle('active', b.dataset.impTab === tab));
-  document.getElementById('imp-tab-weekly').style.display  = tab === 'weekly'  ? '' : 'none';
+  document.getElementById('imp-tab-tph').style.display     = tab === 'tph'     ? '' : 'none';
+  document.getElementById('imp-tab-csat').style.display    = tab === 'csat'    ? '' : 'none';
   document.getElementById('imp-tab-monthly').style.display = tab === 'monthly' ? '' : 'none';
   document.getElementById('imp-tab-qas').style.display     = tab === 'qas'     ? '' : 'none';
+}
+
+// ─── Date helpers ────────────────────────────────────────────
+// Convert ISO-ish year+week (1..52) to that week's Sunday date.
+// Week 1 = the week containing Jan 1 (per common convention used in CookUnity reports).
+// Returns YYYY-MM-DD string.
+function weekToSunday(year, weekNum){
+  const y = parseInt(year, 10);
+  const w = parseInt(weekNum, 10);
+  if(!y || !w || w < 1 || w > 53) return null;
+  // Find the Sunday on or before Jan 1
+  const jan1 = new Date(y, 0, 1);
+  const dayOfWeek = jan1.getDay(); // 0=Sun
+  const firstSunday = new Date(y, 0, 1 - dayOfWeek);
+  // Add (w-1) weeks
+  const target = new Date(firstSunday.getTime() + (w - 1) * 7 * 24 * 60 * 60 * 1000);
+  return target.toISOString().slice(0, 10);
+}
+
+// Convert month (1-12) + year to the 1st of that month, YYYY-MM-DD.
+function monthToFirstOfMonth(year, monthNum){
+  const y = parseInt(year, 10);
+  const m = parseInt(monthNum, 10);
+  if(!y || !m || m < 1 || m > 12) return null;
+  return `${y}-${String(m).padStart(2,'0')}-01`;
 }
 
 // Read a file and resolve to an array of plain row objects (header → value).
@@ -3307,14 +3534,113 @@ function splitCSVLine(line){
 
 // ─────────── METRICS IMPORT ───────────
 
+// Period-specific config — what columns the CSV/XLSX has, how rows look,
+// how to find the anchor date, how to match specialists.
+const METRIC_PERIOD_CONFIG = {
+  tph: {
+    label: 'TPH (Weekly)',
+    periodType: 'weekly',
+    matchBy: 'email',
+    requiredColumns: ['email','week'],
+    previewColumns: ['email','tph','aht','tickets','week','year'],
+    // Map row data to metric fields
+    rowToMetric: (row, anchorDate) => ({
+      date: anchorDate, periodType: 'weekly',
+      tph: pf(row.tph), aht: pf(row.aht), tickets: pi(row.tickets)
+    })
+  },
+  csat: {
+    label: 'CSAT (Weekly)',
+    periodType: 'weekly',
+    matchBy: 'email',
+    requiredColumns: ['email','week'],
+    previewColumns: ['email','csat','goodsurveys','badsurveys','totalsurveys','week','year'],
+    rowToMetric: (row, anchorDate) => ({
+      date: anchorDate, periodType: 'weekly',
+      csat: pf(row.csat),
+      goodSurveys:  pi(row.goodsurveys || row.goodSurveys || row['good surveys']),
+      badSurveys:   pi(row.badsurveys  || row.badSurveys  || row['bad surveys']),
+      totalSurveys: pi(row.totalsurveys|| row.totalSurveys|| row['total surveys'])
+    })
+  },
+  monthly: {
+    label: 'Monthly',
+    periodType: 'monthly',
+    matchBy: 'name',
+    requiredColumns: ['specialist','month'],
+    previewColumns: ['specialist','month','year','csat','goodsurveys','badsurveys','totalsurveys','iqs','tickets','aht','tph','notes','recognition'],
+    rowToMetric: (row, anchorDate) => ({
+      date: anchorDate, periodType: 'monthly',
+      csat: pf(row.csat),
+      goodSurveys:  pi(row.goodsurveys || row.goodSurveys || row['good surveys']),
+      badSurveys:   pi(row.badsurveys  || row.badSurveys  || row['bad surveys']),
+      totalSurveys: pi(row.totalsurveys|| row.totalSurveys|| row['total surveys']),
+      iqs: pf(row.iqs),
+      qa:  pf(row.iqs), // IQS becomes the "QA score" so it shows on existing dashboards
+      tickets: pi(row.tickets),
+      aht: pf(row.aht),
+      tph: pf(row.tph),
+      notes: (row.notes||'').trim(),
+      recognition: (row.recognition||'').trim()
+    })
+  }
+};
+
+// Resolve a row to a specialist (by email or by name) + anchor date (week/month → date).
+function resolveMetricRow(row, period){
+  const cfg = METRIC_PERIOD_CONFIG[period];
+  if(!cfg) return {errors:['unknown period']};
+  const errors = [];
+
+  // Match specialist
+  let spec = null;
+  if(cfg.matchBy === 'email'){
+    const e = String(row.email || '').trim().toLowerCase();
+    if(!e) errors.push('email required');
+    else {
+      spec = SPECIALISTS.find(s => String(s.email||'').trim().toLowerCase() === e);
+      if(!spec) errors.push('specialist email not found');
+    }
+  } else {
+    const n = String(row.specialist || '').trim().toLowerCase();
+    if(!n) errors.push('specialist required');
+    else {
+      spec = SPECIALISTS.find(s => s.name.toLowerCase() === n);
+      if(!spec) errors.push('specialist name not found');
+    }
+  }
+
+  // Compute anchor date
+  let anchorDate = null;
+  const fallbackYear = new Date().getFullYear();
+  if(period === 'tph' || period === 'csat'){
+    const week = parseInt(row.week, 10);
+    if(!week || week < 1 || week > 53) errors.push('week must be 1–53');
+    else {
+      anchorDate = weekToSunday(row.year || fallbackYear, week);
+      if(!anchorDate) errors.push('could not resolve week to a date');
+    }
+  } else if(period === 'monthly'){
+    const month = parseInt(row.month, 10);
+    if(!month || month < 1 || month > 12) errors.push('month must be 1–12');
+    else {
+      anchorDate = monthToFirstOfMonth(row.year || fallbackYear, month);
+      if(!anchorDate) errors.push('could not resolve month to a date');
+    }
+  }
+
+  return {spec, anchorDate, errors};
+}
+
 async function previewMetricsFile(input, period){
-  period = period || 'weekly';
+  period = period || 'tph';
   parsedCSVRows[period] = [];
   document.getElementById(`csv-import-btn-${period}`).disabled = true;
   document.getElementById(`csv-status-${period}`).style.display = 'none';
   document.getElementById(`csv-preview-wrap-${period}`).style.display = 'none';
   const file = input.files[0]; if(!file) return;
   const statusEl = document.getElementById(`csv-status-${period}`);
+
   let rows;
   try {
     rows = await readSpreadsheetFile(file);
@@ -3326,99 +3652,101 @@ async function previewMetricsFile(input, period){
   rows = rows.filter(r => Object.values(r).some(v => v !== ''));
   parsedCSVRows[period] = rows;
 
-  // Validate: specialist must match, date must be valid AND match period anchor
-  let matched = 0, unmatched = 0, badDate = 0;
-  const preview = rows.slice(0,8).map(r => {
-    const spec = SPECIALISTS.find(s => s.name.toLowerCase() === (r.specialist||'').toLowerCase());
-    let dateOk = true, dateMsg = '';
-    if(r.date){
-      const d = new Date(r.date);
-      if(isNaN(d)){ dateOk = false; dateMsg = 'invalid date'; }
-      else if(period === 'weekly' && d.getDay() !== 0){ dateOk = false; dateMsg = 'not a Sunday'; }
-      else if(period === 'monthly' && d.getDate() !== 1){ dateOk = false; dateMsg = 'not the 1st of the month'; }
-    }
-    if(!spec){ unmatched++; }
-    else if(!dateOk){ badDate++; }
-    else matched++;
-    return {row:r, spec, dateOk, dateMsg};
+  // Validate and resolve each row
+  let validCount = 0, invalidCount = 0;
+  const resolved = rows.map(r => {
+    const res = resolveMetricRow(r, period);
+    if(res.errors.length) invalidCount++; else validCount++;
+    return {row:r, ...res};
   });
+  parsedCSVRows[period] = resolved; // store resolved versions
 
-  let msg = `✅ Parsed ${rows.length} rows.`;
-  const warnings = [];
-  if(unmatched) warnings.push(`${unmatched} specialist name(s) unmatched`);
-  if(badDate)   warnings.push(`${badDate} date(s) don't fit ${period} (need ${period==='weekly'?'Sunday':'1st of month'})`);
-  if(warnings.length) msg += ' ⚠ ' + warnings.join(', ') + ' — those rows will be skipped.';
-  else msg += ` All ${matched} ready to import.`;
+  let msg = `✅ Parsed ${rows.length} rows — ${validCount} valid.`;
+  if(invalidCount) msg += ` ⚠ ${invalidCount} will be skipped due to errors.`;
   statusEl.textContent = msg;
-  statusEl.style.background = warnings.length ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)';
-  statusEl.style.color      = warnings.length ? '#F59E0B' : '#34D399';
+  statusEl.style.background = invalidCount ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)';
+  statusEl.style.color      = invalidCount ? '#F59E0B' : '#34D399';
   statusEl.style.display = 'block';
 
-  // Render preview with row-level status indicators
-  const keys = Object.keys(rows[0] || {});
-  const tableHtml = `<table><thead><tr>${keys.map(k=>`<th>${esc(k)}</th>`).join('')}<th>Status</th></tr></thead><tbody>${preview.map(p => {
-    const okClass = (p.spec && p.dateOk) ? '' : 'opacity:.55;background:rgba(245,158,11,.05)';
-    const status = !p.spec ? `<span style="color:#F59E0B;font-size:11px">⚠ specialist not found</span>`
-                 : !p.dateOk ? `<span style="color:#F59E0B;font-size:11px">⚠ ${esc(p.dateMsg)}</span>`
-                 : `<span style="color:#34D399;font-size:11px">✓ ok</span>`;
-    return `<tr style="${okClass}">${keys.map(k=>`<td style="font-size:11px">${esc(p.row[k]||'')}</td>`).join('')}<td>${status}</td></tr>`;
-  }).join('')}</tbody></table>`;
-  document.getElementById(`csv-preview-table-${period}`).innerHTML = tableHtml;
+  // Preview with status
+  const cfg = METRIC_PERIOD_CONFIG[period];
+  const cols = cfg.previewColumns;
+  const header = cols.map(c => `<th>${esc(c)}</th>`).join('') + '<th>Resolves to</th><th>Status</th>';
+  const preview = resolved.slice(0, 8);
+  const body = preview.map(item => {
+    const r = item.row;
+    const rowStyle = item.errors.length ? 'opacity:.55;background:rgba(245,158,11,.05)' : '';
+    const status = item.errors.length
+      ? `<span style="color:#F59E0B;font-size:11px">⚠ ${esc(item.errors.join(', '))}</span>`
+      : `<span style="color:#34D399;font-size:11px">✓ ok</span>`;
+    const resolvesTo = item.spec && item.anchorDate
+      ? `<span style="font-size:11px;color:var(--text2)">${esc(item.spec.name.split(' ')[0])} · ${fmt(item.anchorDate)}</span>`
+      : `<span style="color:var(--text3);font-size:11px">—</span>`;
+    return `<tr style="${rowStyle}">${cols.map(c=>`<td style="font-size:11px">${esc(r[c.toLowerCase()] ?? r[c] ?? '')}</td>`).join('')}<td>${resolvesTo}</td><td>${status}</td></tr>`;
+  }).join('');
+  document.getElementById(`csv-preview-table-${period}`).innerHTML = `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
   document.getElementById(`csv-preview-wrap-${period}`).style.display = 'block';
-
-  // Count globally valid rows (not just preview) for the import button
-  const validCount = rows.filter(r => {
-    const sp = SPECIALISTS.find(s => s.name.toLowerCase() === (r.specialist||'').toLowerCase());
-    if(!sp) return false;
-    if(!r.date) return false;
-    const d = new Date(r.date);
-    if(isNaN(d)) return false;
-    if(period === 'weekly' && d.getDay() !== 0) return false;
-    if(period === 'monthly' && d.getDate() !== 1) return false;
-    return true;
-  }).length;
   document.getElementById(`csv-import-btn-${period}`).disabled = validCount === 0;
 }
 
 function importCSV(period){
-  period = period || 'weekly';
+  period = period || 'tph';
+  const cfg = METRIC_PERIOD_CONFIG[period];
   const rows = parsedCSVRows[period];
-  if(!rows || !rows.length) return;
-  let imported = 0, skipped = 0;
-  const newEntries = [];
-  rows.forEach(row => {
-    const spec = SPECIALISTS.find(s => s.name.toLowerCase() === (row.specialist||'').toLowerCase());
-    if(!spec){ skipped++; return; }
-    if(!row.date){ skipped++; return; }
-    const d = new Date(row.date);
-    if(isNaN(d)){ skipped++; return; }
-    if(period === 'weekly'  && d.getDay() !== 0){ skipped++; return; }
-    if(period === 'monthly' && d.getDate() !== 1){ skipped++; return; }
-    const entry = {
-      id: genId(), specialistId: spec.id, date: row.date, periodType: period,
-      csat: pf(row.csat), tph: pf(row.tph), aht: pf(row.aht), qa: pf(row.qa),
-      tickets: pi(row.tickets), dsats: pi(row.dsats), adherence: pf(row.adherence),
-      escalations: pi(row.escalations), notes: (row.notes||'').trim(),
-      recognition: (row.recognition||'').trim(),
-      createdAt: new Date().toISOString()
-    };
-    db.metrics.push(entry);
-    newEntries.push(entry);
-    imported++;
+  if(!cfg || !rows || !rows.length) return;
+  let inserted = 0, merged = 0, skipped = 0;
+  const changedEntries = [];
+
+  rows.forEach(item => {
+    if(item.errors && item.errors.length){ skipped++; return; }
+    const spec = item.spec;
+    const anchorDate = item.anchorDate;
+    if(!spec || !anchorDate){ skipped++; return; }
+    const fields = cfg.rowToMetric(item.row, anchorDate);
+
+    // Merge by (specialistId, date, periodType): if a row exists, update fields in place
+    const existing = db.metrics.find(m =>
+      m.specialistId === spec.id &&
+      m.date === anchorDate &&
+      (m.periodType || 'weekly') === cfg.periodType
+    );
+    if(existing){
+      // Only overwrite fields that are present (non-zero / non-empty) on the new row.
+      // This preserves CSAT data when re-importing TPH and vice versa.
+      Object.keys(fields).forEach(k => {
+        const v = fields[k];
+        const isMeaningful = typeof v === 'number' ? !isNaN(v) && v !== 0
+                           : typeof v === 'string' ? v.trim() !== ''
+                           : v != null;
+        if(isMeaningful || k === 'date' || k === 'periodType') existing[k] = v;
+      });
+      changedEntries.push({op:'update', row:existing});
+      merged++;
+    } else {
+      const entry = {
+        id: genId(), specialistId: spec.id,
+        ...fields,
+        createdAt: new Date().toISOString()
+      };
+      db.metrics.push(entry);
+      changedEntries.push({op:'insert', row:entry});
+      inserted++;
+    }
   });
+
   localStorage.setItem(STORE_KEY, JSON.stringify(db));
   if(isCloudEnabled()){
-    newEntries.forEach(entry => cloudPush({tab:'Metrics', op:'insert', row:entry}));
+    changedEntries.forEach(ch => cloudPush({tab:'Metrics', op:ch.op, row:ch.row}));
   }
   document.getElementById(`csv-import-status-${period}`).textContent =
-    `✅ ${imported} imported, ${skipped} skipped.${isCloudEnabled()?' Syncing to sheet…':''}`;
-  toast(`✅ Imported ${imported} ${period} metrics!`);
+    `✅ ${inserted} new, ${merged} merged into existing, ${skipped} skipped.${isCloudEnabled()?' Syncing to sheet…':''}`;
+  toast(`✅ Imported ${inserted + merged} ${cfg.label} record(s)!`);
   parsedCSVRows[period] = [];
   document.getElementById(`csv-import-btn-${period}`).disabled = true;
 }
 
 function clearCSVImport(period){
-  period = period || 'weekly';
+  period = period || 'tph';
   parsedCSVRows[period] = [];
   document.getElementById(`csv-file-${period}`).value = '';
   document.getElementById(`csv-status-${period}`).style.display = 'none';
@@ -3428,21 +3756,30 @@ function clearCSVImport(period){
 }
 
 function downloadMetricsTemplate(period){
-  period = period || 'weekly';
-  // Note: no periodType column — it's enforced by which tab you upload to
-  const headers = ['specialist','date','csat','tph','qa','aht','tickets','dsats','adherence','escalations','notes','recognition'];
-  const exampleDate = period === 'monthly' ? '2026-05-01' : '2026-05-10';
-  const exampleNote = period === 'monthly' ? 'Strong May'  : 'Great week';
-  const exampleRec  = period === 'monthly' ? 'Owned the SLA dashboard' : 'Resolved tough case';
-  const sample  = ['Candelaria Lucena', exampleDate, '87.5','5.2','91.5','6.2','124','2','96.0','1', exampleNote, exampleRec];
+  period = period || 'tph';
+  let headers, sample, filename;
+  const currentYear = new Date().getFullYear();
+  if(period === 'tph'){
+    headers = ['email','tph','aht','tickets','week','year'];
+    sample  = ['candelaria@cookunity.com', '5.2', '6.2', '124', '19', String(currentYear)];
+    filename = 'tph-weekly-template.csv';
+  } else if(period === 'csat'){
+    headers = ['email','csat','goodSurveys','badSurveys','totalSurveys','week','year'];
+    sample  = ['candelaria@cookunity.com', '87.5', '34', '4', '38', '19', String(currentYear)];
+    filename = 'csat-weekly-template.csv';
+  } else {
+    headers = ['specialist','month','year','csat','goodSurveys','badSurveys','totalSurveys','iqs','tickets','aht','tph','notes','recognition'];
+    sample  = ['Candelaria Lucena', '5', String(currentYear), '85.4', '136', '18', '154', '91.2', '510', '6.5', '5.0', 'Strong May', 'Owned the SLA dashboard'];
+    filename = 'monthly-template.csv';
+  }
   const csv = headers.join(',') + '\n' + sample.join(',') + '\n';
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `${period}-metrics-template.csv`;
+  a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast(`📥 ${period === 'weekly' ? 'Weekly' : 'Monthly'} template downloaded.`);
+  toast('📥 Template downloaded.');
 }
 
 // ─────────── QA IMPORT ───────────
@@ -3604,12 +3941,75 @@ function renderAnalytics(){
   }).sort((a,b)=>(b.csat||0)-(a.csat||0));
   document.getElementById('an-leaderboard').innerHTML=`<table><thead><tr><th>#</th><th>Specialist</th><th>CSAT</th><th>QA</th><th>AHT</th><th>Adherence</th><th>Entries</th></tr></thead><tbody>${lb.map((row,i)=>`<tr><td style="font-family:'Inter',sans-serif;font-weight:800;color:${i===0?'#FCD34D':i===1?'#94A3B8':i===2?'#C4A36A':'var(--text3)'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td><td><div style="display:flex;align-items:center;gap:7px">${avatarHTML(row.s,22,9,6)}<span style="font-size:12px;font-weight:600">${row.s.name}</span></div></td><td>${scoreCell(row.csat?.toFixed(1),80,true,'%')}</td><td>${scoreCell(row.qa?.toFixed(1),85,true,'%')}</td><td>${row.aht?row.aht.toFixed(1)+' min':'—'}</td><td>${row.adh?row.adh.toFixed(1)+'%':'—'}</td><td>${row.ct}</td></tr>`).join('')}</tbody></table>`;
   renderAnalyticsFailurePatterns();
+  renderDsatResponsibility();
 }
 
 function renderAnalyticsFailurePatterns(){
   const specId = document.getElementById('an-fp-spec')?.value || null;
-  const period = document.getElementById('an-fp-period')?.value || 'month';
-  renderFailurePatterns(document.getElementById('an-fp-body'), specId, period);
+  const period = document.getElementById('an-fp-period')?.value || 'this-month';
+  renderFailurePatterns(document.getElementById('an-fp-body'), specId, period, 'an-fp-period');
+}
+
+// Renders DSAT responsibility breakdown: total agent vs not-agent + per-specialist
+function renderDsatResponsibility(){
+  const el = document.getElementById('an-resp-body');
+  if(!el) return;
+  const period = document.getElementById('an-resp-period')?.value || 'this-month';
+  const dsats = filterByPeriod(db.dsats || [], period, 'an-resp-period');
+
+  if(!dsats.length){
+    el.innerHTML = '<div class="empty" style="padding:40px"><div class="ei">🎯</div><p>No DSATs in this period.</p></div>';
+    return;
+  }
+
+  // Team-wide totals
+  const agentTotal    = dsats.filter(d => d.responsibility === 'agent').length;
+  const notAgentTotal = dsats.filter(d => d.responsibility === 'not-agent').length;
+  const unmarked      = dsats.length - agentTotal - notAgentTotal;
+  const pct = n => dsats.length ? Math.round(n / dsats.length * 100) : 0;
+
+  // Per-specialist breakdown
+  const bySpec = {};
+  dsats.forEach(d => {
+    if(!bySpec[d.specialistId]) bySpec[d.specialistId] = {agent:0, notAgent:0, unmarked:0, total:0};
+    bySpec[d.specialistId].total++;
+    if(d.responsibility === 'agent')         bySpec[d.specialistId].agent++;
+    else if(d.responsibility === 'not-agent') bySpec[d.specialistId].notAgent++;
+    else                                     bySpec[d.specialistId].unmarked++;
+  });
+  const rows = Object.entries(bySpec).map(([sid, x]) => {
+    const sp = SPECIALISTS.find(s => s.id === sid);
+    return {sp, ...x, agentPct: x.total ? Math.round(x.agent / x.total * 100) : 0};
+  }).filter(r => r.sp).sort((a,b) => b.agent - a.agent);
+
+  el.innerHTML = `
+    <div class="stats-grid" style="margin-bottom:14px">
+      <div class="stat-card sc-red"><div class="sl">🔴 Agent-Related</div><div class="sv">${agentTotal}</div><div class="ss">${pct(agentTotal)}% of total</div></div>
+      <div class="stat-card sc-green"><div class="sl">🟢 Not Agent-Related</div><div class="sv">${notAgentTotal}</div><div class="ss">${pct(notAgentTotal)}% of total</div></div>
+      <div class="stat-card sc-amber"><div class="sl">— Not Yet Marked</div><div class="sv">${unmarked}</div><div class="ss">${pct(unmarked)}% of total</div></div>
+      <div class="stat-card sc-blue"><div class="sl">Total DSATs</div><div class="sv">${dsats.length}</div></div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Specialist</th><th>🔴 Agent</th><th>🟢 Not Agent</th><th>— Unmarked</th><th>Total</th><th>Agent %</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const stripeColor = r.agentPct >= 70 ? '#EF4444' : r.agentPct >= 40 ? '#F59E0B' : '#10B981';
+        return `<tr style="cursor:pointer" onclick="navTo('spec-detail','${r.sp.id}')">
+          <td><div style="display:flex;align-items:center;gap:7px">${avatarHTML(r.sp,24,10,6)}<span style="font-size:12px;font-weight:600">${esc(r.sp.name)}</span></div></td>
+          <td><span style="color:#EF4444;font-weight:700">${r.agent}</span></td>
+          <td><span style="color:#10B981;font-weight:700">${r.notAgent}</span></td>
+          <td><span style="color:var(--text3)">${r.unmarked}</span></td>
+          <td style="font-weight:600">${r.total}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;min-width:60px;height:6px;background:var(--surface3);border-radius:99px;overflow:hidden">
+                <div style="height:100%;width:${r.agentPct}%;background:${stripeColor}"></div>
+              </div>
+              <span style="font-family:'Inter',sans-serif;font-weight:800;color:${stripeColor};font-size:12px;min-width:36px">${r.agentPct}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -4130,6 +4530,7 @@ function openDsatModal(specId){
   populateDsatSubreasons([]);
   const prev=document.getElementById('d-prev');     if(prev) prev.selectedIndex=0;
   const res=document.getElementById('d-res');       if(res)  res.selectedIndex=0;
+  const resp=document.getElementById('d-resp');     if(resp) resp.value = '';
   openModal('dsat-modal');
 }
 
@@ -4148,6 +4549,7 @@ function openEditDsat(id){
   populateDsatSubreasons(asMultiList(d.subreason));
   if(d.isPreventable) document.getElementById('d-prev').value      = d.isPreventable;
   if(d.resolved)      document.getElementById('d-res').value       = d.resolved;
+  document.getElementById('d-resp').value = d.responsibility || '';
   openModal('dsat-modal');
 }
 
@@ -4160,6 +4562,7 @@ function saveDsat(){
   if(!sid||!ticket||!date||!details){toast('Fill all required fields.',false);return;}
   const subreasonArr = readMultiPick(document.getElementById('d-subreason-multi'));
   const subreason = joinMultiList(subreasonArr);
+  const responsibility = document.getElementById('d-resp').value || '';
 
   if(editId){
     // EDIT: update existing record, preserving status/ack fields
@@ -4170,6 +4573,7 @@ function saveDsat(){
     d.subreason = subreason;
     d.isPreventable = document.getElementById('d-prev').value;
     d.resolved = document.getElementById('d-res').value;
+    d.responsibility = responsibility;
     d.details = details;
     d.feedback = document.getElementById('d-feedback').value.trim();
     _pendingSync = {tab:'DSATs', op:'update', row:d};
@@ -4180,6 +4584,7 @@ function saveDsat(){
       subreason,
       isPreventable:document.getElementById('d-prev').value,
       resolved:document.getElementById('d-res').value,
+      responsibility,
       details,feedback:document.getElementById('d-feedback').value.trim(),
       status:'pending',createdAt:new Date().toISOString()
     };
@@ -5895,7 +6300,14 @@ function renderDsatCard(d, showSpec, isAdmin, isSpecView){
   const s=SPECIALISTS.find(x=>x.id===d.specialistId);
   const isPending=d.status==='pending';
   const canAck = isSpecView || (session?.role==='admin');
-  return `<div class="dsat-card ${isPending?'pending':'acknowledged'}">
+  // Responsibility marker — left border color + badge
+  const respMeta = d.responsibility === 'agent'
+    ? {color:'#EF4444', bg:'rgba(239,68,68,.1)', label:'🔴 Agent-Related'}
+    : d.responsibility === 'not-agent'
+      ? {color:'#10B981', bg:'rgba(16,185,129,.1)', label:'🟢 Not Agent-Related'}
+      : null;
+  const cardBorder = respMeta ? `border-left:4px solid ${respMeta.color}` : '';
+  return `<div class="dsat-card ${isPending?'pending':'acknowledged'}" style="${cardBorder}">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap">
       <div>
         ${showSpec&&s?`<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">${avatarHTML(s,24,9,6)}<span style="font-size:12px;font-weight:700;color:var(--text)">${s.name}</span></div>`:''}
@@ -5906,6 +6318,7 @@ function renderDsatCard(d, showSpec, isAdmin, isSpecView){
         <span class="badge ${isPending?'bg-amber':'bg-green'}">${isPending?'⏳ Pending':'✓ Acknowledged'}</span>
         <span class="badge bg-gray">${esc(d.subreason)}</span>
         <span class="badge ${d.isPreventable==='YES'?'bg-red':'bg-green'}">${d.isPreventable==='YES'?'Preventable':'Not Preventable'}</span>
+        ${respMeta ? `<span class="badge" style="background:${respMeta.bg};color:${respMeta.color};border:1px solid ${respMeta.color}55;font-weight:700">${respMeta.label}</span>` : ''}
       </div>
     </div>
     ${d.details?`<div style="font-size:12px;color:var(--text2);line-height:1.65;margin-bottom:9px"><strong style="display:block;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Supporting Details</strong>${esc(d.details)}</div>`:''}
@@ -6100,12 +6513,21 @@ function pi(v){const n=parseInt(v);return isNaN(n)?undefined:n;}
 function avg(arr,key){const v=arr.map(r=>r[key]).filter(x=>x!=null&&x!==undefined);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;}
 function getLatest(sid){return[...db.metrics.filter(m=>m.specialistId===sid)].sort((a,b)=>b.date.localeCompare(a.date))[0]||null;}
 function getPrev(sid){return[...db.metrics.filter(m=>m.specialistId===sid)].sort((a,b)=>b.date.localeCompare(a.date))[1]||null;}
-function filterByPeriod(arr,period){
-  if(period==='all') return arr;
-  const now=new Date();
-  if(period==='month'){const ym=now.toISOString().slice(0,7);return arr.filter(r=>(r.date||r.createdAt||'').slice(0,7)===ym);}
-  if(period==='week'){const d=new Date(now);d.setDate(now.getDate()-(now.getDay()||7)+1);d.setHours(0,0,0,0);return arr.filter(r=>new Date(r.date||r.createdAt||0)>=d);}
-  return arr;
+function filterByPeriod(arr,period,filterId){
+  // Legacy short codes ('month','week') still supported for backward compat.
+  // New standard codes ('this-week','last-week','this-month','last-month','all','personalized')
+  // route through periodRangeFor().
+  if(period === 'all') return arr;
+  if(period === 'month' || period === 'this-month') period = 'this-month';
+  else if(period === 'week' || period === 'this-week') period = 'this-week';
+  const range = periodRangeFor(period, filterId);
+  if(!range) return arr;
+  return arr.filter(r => {
+    const ds = r.date || r.createdAt || '';
+    if(!ds) return false;
+    const d = new Date(ds);
+    return !isNaN(d) && d >= range.from && d <= range.to;
+  });
 }
 
 // ════════════════════════════════════════════════════════════
@@ -6117,6 +6539,102 @@ const RANK_TARGETS = { csat: 80, tph: 5, qa: 85 };
 const RANK_WEIGHTS = { csat: 0.40, tph: 0.40, qa: 0.20 };
 const RANK_CAP = 1.5;
 
+// Coaching frequency matrix — combines quartile + number of KPIs below target.
+// Edit labels here to change what shows up in the table.
+const COACHING_MATRIX = {
+  Q1: { 0: {label:'Quarterly',          emoji:'🌈', color:'#10B981', note:'Recognition track'},
+        many:{label:'Monthly',          emoji:'📅', color:'#10B981', note:'Light touch'} },
+  Q2: { 0: {label:'Monthly',            emoji:'📅', color:'#3B82F6', note:'Standard cadence'},
+        many:{label:'Bi-weekly',        emoji:'🗓',  color:'#3B82F6', note:'Address weak KPI'} },
+  Q3: { 0: {label:'Bi-weekly',          emoji:'🗓',  color:'#F59E0B', note:'Focused coaching'},
+        many:{label:'Weekly',           emoji:'📆', color:'#F59E0B', note:'Close the gap'} },
+  Q4: { any: {label:'Weekly + plan',    emoji:'🔥', color:'#EF4444', note:'Action plan required'} }
+};
+
+function coachingFreq(quartile, kpisBelow){
+  if(quartile === 'Q4') return COACHING_MATRIX.Q4.any;
+  const bucket = COACHING_MATRIX[quartile];
+  if(!bucket) return null;
+  return kpisBelow === 0 ? bucket[0] : bucket.many;
+}
+
+// Min-max normalize a value against the team's min and max for the same KPI.
+// Returns a number in [0,1]. If everyone has the same value, returns 1 (no penalty).
+function normMinMax(value, min, max){
+  if(value == null || isNaN(value)) return 0;
+  if(max === min) return 1;
+  return Math.max(0, Math.min(1, (value - min) / (max - min)));
+}
+
+// Build the quartilization view: each agent gets a normalized score per KPI,
+// a composite, a quartile (Q1-Q4), and a coaching frequency.
+function computeQuartilization(mode){
+  // Gather each specialist's averaged CSAT/TPH/QA for the period
+  const rows = [];
+  SPECIALISTS.forEach(s => {
+    const all = db.metrics.filter(m => m.specialistId === s.id);
+    const inPeriod = entriesInPeriod(all, mode);
+    if(!inPeriod.length){
+      rows.push({spec:s, csat:null, tph:null, qa:null, missing:['no entries']});
+      return;
+    }
+    const csat = avg(inPeriod, 'csat');
+    const tph  = avg(inPeriod, 'tph');
+    const qa   = avg(inPeriod, 'qa');
+    const missing = [];
+    if(csat == null) missing.push('CSAT');
+    if(tph  == null) missing.push('TPH');
+    if(qa   == null) missing.push('IQS');
+    rows.push({spec:s, csat, tph, qa, missing});
+  });
+
+  // Split into complete vs incomplete
+  const complete   = rows.filter(r => r.missing.length === 0);
+  const incomplete = rows.filter(r => r.missing.length > 0);
+
+  if(!complete.length) return {ranked:[], incomplete};
+
+  // Find team min/max for each KPI (across complete rows only)
+  const minMax = (key) => {
+    const vals = complete.map(r => r[key]);
+    return {min: Math.min(...vals), max: Math.max(...vals)};
+  };
+  const csatRange = minMax('csat');
+  const tphRange  = minMax('tph');
+  const qaRange   = minMax('qa');
+
+  // Normalize each and compute composite
+  complete.forEach(r => {
+    r.csatNorm = normMinMax(r.csat, csatRange.min, csatRange.max);
+    r.tphNorm  = normMinMax(r.tph,  tphRange.min,  tphRange.max);
+    r.qaNorm   = normMinMax(r.qa,   qaRange.min,   qaRange.max);
+    r.composite = (r.tphNorm * RANK_WEIGHTS.tph) +
+                  (r.csatNorm * RANK_WEIGHTS.csat) +
+                  (r.qaNorm   * RANK_WEIGHTS.qa);
+    // Below-target flags (raw values vs targets)
+    r.csatBelow = r.csat < RANK_TARGETS.csat;
+    r.tphBelow  = r.tph  < RANK_TARGETS.tph;
+    r.qaBelow   = r.qa   < RANK_TARGETS.qa;
+    r.kpisBelow = (r.csatBelow?1:0) + (r.tphBelow?1:0) + (r.qaBelow?1:0);
+  });
+
+  // Sort by composite descending
+  complete.sort((a,b) => b.composite - a.composite);
+
+  // Assign quartiles by rank position (Q1 = top 25%, Q4 = bottom 25%)
+  const n = complete.length;
+  complete.forEach((r, idx) => {
+    const pct = (idx + 1) / n; // 1/n .. 1.0
+    if(pct <= 0.25)      r.quartile = 'Q1';
+    else if(pct <= 0.50) r.quartile = 'Q2';
+    else if(pct <= 0.75) r.quartile = 'Q3';
+    else                 r.quartile = 'Q4';
+    r.coaching = coachingFreq(r.quartile, r.kpisBelow);
+  });
+
+  return {ranked:complete, incomplete};
+}
+
 function isoWeekStr(d){
   // Returns "YYYY-Www" — ISO week, where week 1 is the week containing the first Thursday.
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -6127,16 +6645,151 @@ function isoWeekStr(d){
   return `${date.getUTCFullYear()}-W${String(weekNum).padStart(2,'0')}`;
 }
 
+// ════════════════════════════════════════════════════════════
+// UNIFIED PERIOD FILTERS — used by every date filter in the app
+// ════════════════════════════════════════════════════════════
+// Standard options used in every period dropdown across the app
+const STD_PERIOD_OPTIONS = [
+  {value:'this-week',     label:'This Week'},
+  {value:'last-week',     label:'Last Week'},
+  {value:'this-month',    label:'This Month', selected:true},
+  {value:'last-month',    label:'Last Month'},
+  {value:'all',           label:'All Time'},
+  {value:'personalized',  label:'📅 Personalized…'}
+];
+
+// Holds active personalized ranges per filter-id (only populated after user picks one)
+const _periodRanges = {}; // { 'an-fp-period': {from:'2026-01-01', to:'2026-03-31'}, ... }
+
+// Returns the standard <option> HTML for a period filter.
+function periodFilterOptions(defaultValue){
+  const def = defaultValue || 'this-month';
+  return STD_PERIOD_OPTIONS.map(o => {
+    const sel = o.value === def ? ' selected' : '';
+    return `<option value="${o.value}"${sel}>${o.label}</option>`;
+  }).join('');
+}
+
+// Returns {from:Date, to:Date} for a given mode + filter-id (so personalized ranges can be looked up).
+// Returns null for 'all' (no filtering).
+function periodRangeFor(mode, filterId){
+  const now = new Date();
+  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if(mode === 'this-week'){
+    // Sunday → Saturday containing today
+    const sun = new Date(today0); sun.setDate(today0.getDate() - today0.getDay());
+    const sat = new Date(sun); sat.setDate(sun.getDate() + 6); sat.setHours(23,59,59,999);
+    return {from:sun, to:sat};
+  }
+  if(mode === 'last-week'){
+    const sun = new Date(today0); sun.setDate(today0.getDate() - today0.getDay() - 7);
+    const sat = new Date(sun); sat.setDate(sun.getDate() + 6); sat.setHours(23,59,59,999);
+    return {from:sun, to:sat};
+  }
+  if(mode === 'this-month'){
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end   = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59,999);
+    return {from:start, to:end};
+  }
+  if(mode === 'last-month'){
+    const start = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth(), 0, 23,59,59,999);
+    return {from:start, to:end};
+  }
+  if(mode === 'all') return null;
+  if(mode === 'personalized'){
+    const r = _periodRanges[filterId];
+    if(!r) return null; // fall back to all-time until user picks dates
+    return {
+      from: new Date(r.from + 'T00:00:00'),
+      to:   new Date(r.to + 'T23:59:59.999')
+    };
+  }
+  return null;
+}
+
+// Returns true if a YYYY-MM-DD date string falls inside the range for this filter.
+function dateInPeriod(dateStr, filterId){
+  if(!dateStr) return false;
+  const el = document.getElementById(filterId);
+  const mode = el ? el.value : 'all';
+  const range = periodRangeFor(mode, filterId);
+  if(!range) return true; // 'all' or unset personalized → don't filter out
+  const d = new Date(dateStr);
+  if(isNaN(d)) return false;
+  return d >= range.from && d <= range.to;
+}
+
+// Returns the human-readable label for the current selection of a filter — useful for sub-titles.
+function periodLabelFor(filterId){
+  const el = document.getElementById(filterId);
+  if(!el) return '';
+  const mode = el.value;
+  const opt = STD_PERIOD_OPTIONS.find(o => o.value === mode);
+  if(mode === 'personalized'){
+    const r = _periodRanges[filterId];
+    if(r) return `${fmt(r.from)} → ${fmt(r.to)}`;
+    return '📅 Personalized (pick dates)';
+  }
+  return opt ? opt.label : mode;
+}
+
+// Generic onChange wired to every period filter — opens personalized modal when needed.
+function onPeriodFilterChange(filterId, callback){
+  const el = document.getElementById(filterId);
+  if(!el) return;
+  if(el.value === 'personalized'){
+    openPersonalizedPeriodModal(filterId, callback);
+  } else {
+    if(typeof callback === 'function') callback();
+  }
+}
+
+// Opens the personalized-period modal for a given filterId.
+function openPersonalizedPeriodModal(filterId, callback){
+  const r = _periodRanges[filterId];
+  const todayStr = new Date().toISOString().slice(0,10);
+  document.getElementById('pp-filter-id').value = filterId;
+  document.getElementById('pp-from').value = (r && r.from) || todayStr;
+  document.getElementById('pp-to').value   = (r && r.to)   || todayStr;
+  // Stash callback on the modal so the save button can retrieve it
+  _personalizedCallback = callback || null;
+  openModal('personalized-period-modal');
+}
+
+let _personalizedCallback = null;
+function savePersonalizedPeriod(){
+  const filterId = document.getElementById('pp-filter-id').value;
+  const from = document.getElementById('pp-from').value;
+  const to   = document.getElementById('pp-to').value;
+  if(!from || !to){ toast('Pick both dates.', false); return; }
+  if(from > to){ toast('"From" must be on or before "To".', false); return; }
+  _periodRanges[filterId] = {from, to};
+  closeModal('personalized-period-modal');
+  if(typeof _personalizedCallback === 'function'){
+    _personalizedCallback();
+    _personalizedCallback = null;
+  }
+}
+
+
 function entriesInPeriod(entries, mode){
-  // mode = 'week' (current ISO week) or 'month' (current calendar month)
+  // mode = 'week' | 'last-week' | 'month'. When mode==='month', _rankMonth ('YYYY-MM' or '') picks the target month.
   const now = new Date();
   if(mode==='week'){
     const tag = isoWeekStr(now);
     return entries.filter(e => e.date && isoWeekStr(new Date(e.date)) === tag);
   }
-  // month
-  const ym = now.toISOString().slice(0,7);
-  return entries.filter(e => (e.date||'').slice(0,7) === ym);
+  if(mode==='last-week'){
+    const lw = new Date(now); lw.setDate(lw.getDate() - 7);
+    const tag = isoWeekStr(lw);
+    return entries.filter(e => e.date && isoWeekStr(new Date(e.date)) === tag);
+  }
+  if(mode==='month'){
+    const ym = _rankMonth || now.toISOString().slice(0,7);
+    return entries.filter(e => (e.date||'').slice(0,7) === ym);
+  }
+  return [];
 }
 
 function computeRanking(mode){
@@ -6179,23 +6832,26 @@ function computeRanking(mode){
 
 // Computes category + subcategory frequency for a given specialist (or null = all)
 // scoped to a period: 'all' | 'month' | 'week' | {from:'YYYY-MM-DD', to:'YYYY-MM-DD'}
-function computeFailurePatterns(specId, period){
+function computeFailurePatterns(specId, period, filterId){
   const inPeriod = (r) => {
     if(!period || period === 'all') return true;
     const d = r.date || (r.createdAt||'').slice(0,10);
     if(!d) return false;
-    if(period === 'month') return d.slice(0,7) === new Date().toISOString().slice(0,7);
-    if(period === 'week'){
-      const now = new Date();
-      const monday = new Date(now); monday.setDate(now.getDate() - (now.getDay()||7) + 1); monday.setHours(0,0,0,0);
-      return new Date(d) >= monday;
-    }
+    // Legacy: explicit object range
     if(typeof period === 'object'){
       if(period.from && d < period.from) return false;
       if(period.to && d > period.to) return false;
       return true;
     }
-    return true;
+    // Legacy short codes
+    if(period === 'month') period = 'this-month';
+    if(period === 'week')  period = 'this-week';
+    // New standard codes — route via periodRangeFor
+    const range = periodRangeFor(period, filterId);
+    if(!range) return true;
+    const dt = new Date(d);
+    if(isNaN(dt)) return false;
+    return dt >= range.from && dt <= range.to;
   };
   const myQas = db.qas.filter(q => (!specId || q.specialistId===specId) && inPeriod(q));
   const myDsats = db.dsats.filter(d => (!specId || d.specialistId===specId) && inPeriod(d));
@@ -6254,9 +6910,9 @@ function computeFailurePatterns(specId, period){
 
 // Renders the failure-patterns block inside a container element.
 // Used on the spec-detail page (with a specific specialist) and on the analytics page.
-function renderFailurePatterns(containerEl, specId, period){
+function renderFailurePatterns(containerEl, specId, period, filterId){
   if(!containerEl) return;
-  const data = computeFailurePatterns(specId, period);
+  const data = computeFailurePatterns(specId, period, filterId);
   if(data.totalQas === 0 && data.totalDsats === 0){
     containerEl.innerHTML = `<div class="empty" style="padding:32px"><div class="ei">📊</div><p>No QA or DSAT entries in this period.</p></div>`;
     return;
@@ -6332,7 +6988,7 @@ function renderFailurePatterns(containerEl, specId, period){
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 
 // Drag-drop wiring for each metrics period + QA
-['weekly','monthly'].forEach(period => {
+['tph','csat','monthly'].forEach(period => {
   const zone = document.getElementById(`csv-zone-${period}`);
   if(!zone) return;
   zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
@@ -6354,6 +7010,12 @@ if(qaZone){
 
 // Initialize the metrics period picker on app load
 initMetricsPeriodPicker();
+
+// Initialize all standard period filters with the unified set of options
+['dash-period','sd-fp-period','an-fp-period','an-resp-period'].forEach(id => {
+  const el = document.getElementById(id);
+  if(el && !el.innerHTML.trim()) el.innerHTML = periodFilterOptions('this-month');
+});
 
 // Auto-pull from cloud on app load (if configured) so logins use fresh data
 (async function bootstrapCloud(){
