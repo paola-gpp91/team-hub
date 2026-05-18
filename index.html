@@ -4020,17 +4020,17 @@ function renderAnalyticsLeaderboard(){
   const sub = document.getElementById('an-lb-sub');
   if(sub) sub.textContent = `${periodLabelFor('an-lb-period')} · Composite = CSAT 40% + TPH 40% + QA 20%`;
 
-  // Render table
-  if(!lb.some(r => r.ct > 0)){
-    el.innerHTML = `<div class="empty" style="padding:32px"><div class="ei">📊</div><p>No metric entries in this period.</p></div>`;
-    return;
-  }
+  // Render table — always shows every specialist, ranked or not
   el.innerHTML = `<table>
     <thead><tr><th>#</th><th>Specialist</th><th>Score</th><th>CSAT</th><th>TPH</th><th>QA</th><th>Entries</th></tr></thead>
     <tbody>${lb.map((row, i) => {
-      const isRanked = row.score != null;
+      const hasScore = row.score != null;
       const medalColor = i===0 ? '#FCD34D' : i===1 ? '#94A3B8' : i===2 ? '#C4A36A' : 'var(--text3)';
-      const medal     = isRanked ? (i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)) : '—';
+      // Always show a position 1..N. Medals on top 3 only when they actually have a score.
+      const medal     = hasScore && i===0 ? '🥇'
+                      : hasScore && i===1 ? '🥈'
+                      : hasScore && i===2 ? '🥉'
+                      : (i+1);
       return `<tr style="cursor:pointer" onclick="navTo('spec-detail','${row.s.id}')">
         <td style="font-family:'Inter',sans-serif;font-weight:800;color:${medalColor}">${medal}</td>
         <td><div style="display:flex;align-items:center;gap:7px">${avatarHTML(row.s,22,9,6)}<span style="font-size:12px;font-weight:600">${row.s.name}</span></div></td>
