@@ -6625,9 +6625,27 @@ function filterByPeriod(arr,period,filterId){
   return arr.filter(r => {
     const ds = r.date || r.createdAt || '';
     if(!ds) return false;
-    const d = new Date(ds);
-    return !isNaN(d) && d >= range.from && d <= range.to;
+    const d = parseDateLocal(ds);
+    return d && d >= range.from && d <= range.to;
   });
+}
+
+// Parses a YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss string as a LOCAL-TIME Date.
+// Plain `new Date("2026-04-01")` treats the string as UTC midnight, which can
+// shift a date back by a day in any timezone west of UTC — a notorious source
+// of off-by-one-month filtering bugs.
+function parseDateLocal(s){
+  if(!s) return null;
+  const str = String(s).trim();
+  // Match YYYY-MM-DD optionally followed by 'T' or space + time
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m){
+    const [, y, mo, d, hh, mm, ss] = m;
+    return new Date(+y, +mo-1, +d, +(hh||0), +(mm||0), +(ss||0));
+  }
+  // Fallback: let the engine try
+  const dt = new Date(str);
+  return isNaN(dt) ? null : dt;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -6815,8 +6833,8 @@ function dateInPeriod(dateStr, filterId){
   const mode = el ? el.value : 'all';
   const range = periodRangeFor(mode, filterId);
   if(!range) return true; // 'all' or unset personalized → don't filter out
-  const d = new Date(dateStr);
-  if(isNaN(d)) return false;
+  const d = parseDateLocal(dateStr);
+  if(!d) return false;
   return d >= range.from && d <= range.to;
 }
 
@@ -6949,8 +6967,8 @@ function computeFailurePatterns(specId, period, filterId){
     // New standard codes — route via periodRangeFor
     const range = periodRangeFor(period, filterId);
     if(!range) return true;
-    const dt = new Date(d);
-    if(isNaN(dt)) return false;
+    const dt = parseDateLocal(d);
+    if(!dt) return false;
     return dt >= range.from && dt <= range.to;
   };
   const myQas = db.qas.filter(q => (!specId || q.specialistId===specId) && inPeriod(q));
