@@ -592,7 +592,7 @@ textarea{resize:vertical;min-height:78px}
     <!-- ─────────── TPH WEEKLY IMPORT ─────────── -->
     <div class="imp-tab-content" id="imp-tab-tph">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">⚡ TPH (Weekly) Format</div><div class="card-sub">Tickets-per-hour data, one row per specialist per week. Imports match specialists by <strong>email</strong>.</div></div></div>
+        <div class="card-hd"><div><div class="card-title">⚡ TPH (Weekly) Format</div><div class="card-sub">CSV or XLSX with a header row. <strong>Stack as many rows as you need</strong> — multiple weeks per specialist, multiple specialists, in any order. Imports match specialists by <strong>email</strong>.</div></div></div>
         <div class="tw">
           <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
           <tbody>
@@ -632,7 +632,7 @@ textarea{resize:vertical;min-height:78px}
     <!-- ─────────── CSAT WEEKLY IMPORT ─────────── -->
     <div class="imp-tab-content" id="imp-tab-csat" style="display:none">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">💬 CSAT (Weekly) Format</div><div class="card-sub">CSAT scores + survey counts, one row per specialist per week. Imports match specialists by <strong>email</strong>.</div></div></div>
+        <div class="card-hd"><div><div class="card-title">💬 CSAT (Weekly) Format</div><div class="card-sub">CSV or XLSX with a header row. <strong>Stack as many rows as you need</strong> — multiple weeks per specialist, multiple specialists, in any order. Imports match specialists by <strong>email</strong>.</div></div></div>
         <div class="tw">
           <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
           <tbody>
@@ -673,7 +673,7 @@ textarea{resize:vertical;min-height:78px}
     <!-- ─────────── MONTHLY IMPORT ─────────── -->
     <div class="imp-tab-content" id="imp-tab-monthly" style="display:none">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">🗓 Monthly Metrics Format</div><div class="card-sub">Full monthly summary, one row per specialist per month. Imports match specialists by <strong>name</strong>.</div></div></div>
+        <div class="card-hd"><div><div class="card-title">🗓 Monthly Metrics Format</div><div class="card-sub">CSV or XLSX with a header row. <strong>Stack as many rows as you need</strong> — same specialist across multiple months, different specialists, in any order.</div></div></div>
         <div class="tw">
           <table><thead><tr><th>Column</th><th>Field</th><th>Example</th><th>Notes</th></tr></thead>
           <tbody>
@@ -3757,29 +3757,56 @@ function clearCSVImport(period){
 
 function downloadMetricsTemplate(period){
   period = period || 'tph';
-  let headers, sample, filename;
+  let headers, samples, filename;
   const currentYear = new Date().getFullYear();
   if(period === 'tph'){
     headers = ['email','tph','aht','tickets','week','year'];
-    sample  = ['candelaria@cookunity.com', '5.2', '6.2', '124', '19', String(currentYear)];
+    samples = [
+      // Multiple weeks, mixed specialists — shows you can stack as many as you need
+      ['candelaria@cookunity.com', '5.2', '6.2', '124', '17', String(currentYear)],
+      ['candelaria@cookunity.com', '5.4', '6.1', '131', '18', String(currentYear)],
+      ['candelaria@cookunity.com', '5.6', '6.0', '138', '19', String(currentYear)],
+      ['walter@cookunity.com',     '4.9', '6.5', '119', '17', String(currentYear)],
+      ['walter@cookunity.com',     '5.1', '6.4', '122', '18', String(currentYear)]
+    ];
     filename = 'tph-weekly-template.csv';
   } else if(period === 'csat'){
     headers = ['email','csat','goodSurveys','badSurveys','totalSurveys','week','year'];
-    sample  = ['candelaria@cookunity.com', '87.5', '34', '4', '38', '19', String(currentYear)];
+    samples = [
+      ['candelaria@cookunity.com', '87.5', '34', '4', '38', '17', String(currentYear)],
+      ['candelaria@cookunity.com', '89.1', '36', '4', '40', '18', String(currentYear)],
+      ['candelaria@cookunity.com', '91.0', '38', '3', '41', '19', String(currentYear)],
+      ['walter@cookunity.com',     '85.2', '29', '5', '34', '17', String(currentYear)],
+      ['walter@cookunity.com',     '86.7', '31', '4', '35', '18', String(currentYear)]
+    ];
     filename = 'csat-weekly-template.csv';
   } else {
     headers = ['specialist','month','year','csat','goodSurveys','badSurveys','totalSurveys','iqs','tickets','aht','tph','notes','recognition'];
-    sample  = ['Candelaria Lucena', '5', String(currentYear), '85.4', '136', '18', '154', '91.2', '510', '6.5', '5.0', 'Strong May', 'Owned the SLA dashboard'];
+    samples = [
+      // Same specialist across months + a different specialist — drop in as many rows as you have data
+      ['Candelaria Lucena', '3', String(currentYear), '83.1', '128', '20', '148', '88.5', '480', '6.6', '4.8', 'Solid March', ''],
+      ['Candelaria Lucena', '4', String(currentYear), '85.4', '136', '18', '154', '91.2', '510', '6.5', '5.0', 'Strong April', 'Owned the SLA dashboard'],
+      ['Candelaria Lucena', '5', String(currentYear), '87.8', '142', '15', '157', '92.6', '525', '6.4', '5.1', 'Best month yet', 'Top CSAT on team'],
+      ['Walter Ylesca',     '3', String(currentYear), '82.0', '120', '22', '142', '86.0', '465', '6.7', '4.7', '', ''],
+      ['Walter Ylesca',     '4', String(currentYear), '83.5', '124', '20', '144', '87.5', '478', '6.6', '4.8', '', '']
+    ];
     filename = 'monthly-template.csv';
   }
-  const csv = headers.join(',') + '\n' + sample.join(',') + '\n';
+  // CSV escape: wrap any field containing a comma or quote in quotes
+  const escapeCsv = v => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [headers.join(',')];
+  samples.forEach(row => lines.push(row.map(escapeCsv).join(',')));
+  const csv = lines.join('\n') + '\n';
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast('📥 Template downloaded.');
+  toast('📥 Template downloaded — add as many rows as you need.');
 }
 
 // ─────────── QA IMPORT ───────────
