@@ -429,6 +429,18 @@ textarea{resize:vertical;min-height:78px}
     </div>
     <div class="stats-grid" id="dash-stats"></div>
 
+    <!-- Spotlight: top movers, watch closely, streak breakers -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-hd"><div><div class="card-title">🔥 Spotlight</div><div class="card-sub" id="spotlight-sub">Movers and patterns worth your attention</div></div></div>
+      <div id="dash-spotlight"></div>
+    </div>
+
+    <!-- Mini Contact Reason breakdown — links out to full Analytics view -->
+    <div class="card" style="margin-bottom:18px" id="dash-cr-card">
+      <div class="card-hd"><div><div class="card-title">💬 Team CSAT by Contact Reason</div><div class="card-sub" id="dash-cr-sub">Top reasons driving good and bad sentiment</div></div><button class="btn btn-secondary btn-sm" onclick="navTo('analytics')">Open Analytics →</button></div>
+      <div id="dash-cr"></div>
+    </div>
+
     <!-- Performance Ranking -->
     <div class="card" style="margin-bottom:18px">
       <div class="card-hd" style="align-items:center">
@@ -1052,6 +1064,13 @@ textarea{resize:vertical;min-height:78px}
     <div class="ph"><div class="ph-left"><h1 id="my-overview-title">My Overview</h1><p>Your performance summary</p></div></div>
     <div id="my-next-1on1"></div>
     <div class="stats-grid" id="my-kpis"></div>
+
+    <!-- Performance vs Team -->
+    <div class="card" id="my-vs-team-card" style="margin-bottom:15px">
+      <div class="card-hd"><div><div class="card-title">🎯 Your Performance vs Team</div><div class="card-sub" id="my-vs-team-sub">How you rank across CSAT, TPH and QA</div></div></div>
+      <div id="my-vs-team"></div>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
       <div class="card"><div class="card-hd"><div class="card-title">My CSAT Trend</div></div><div class="chart-wrap"><canvas id="chart-my-trend"></canvas></div></div>
       <div class="card">
@@ -1059,6 +1078,13 @@ textarea{resize:vertical;min-height:78px}
         <div id="my-pending-dsats"></div>
       </div>
     </div>
+
+    <!-- My Surveys breakdown -->
+    <div class="card" id="my-surveys-card" style="margin-top:15px">
+      <div class="card-hd"><div><div class="card-title">💬 My Surveys</div><div class="card-sub" id="my-surveys-sub">Good vs bad surveys, broken down by contact reason</div></div></div>
+      <div id="my-surveys"></div>
+    </div>
+
     <div class="card" style="margin-top:15px">
       <div class="card-hd"><div class="card-title">Pending QA Acknowledgments</div></div>
       <div id="my-pending-qas"></div>
@@ -2794,6 +2820,8 @@ function renderDashboard(){
   renderRanking();
   renderDashDisputes();
   renderRecognitionWall();
+  renderDashSpotlight();
+  renderDashContactReason();
 
   // Latest metrics table
   const latest = {};
@@ -3032,6 +3060,208 @@ function renderRankingQuart(){
   } else {
     incEl.innerHTML = '';
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// DASHBOARD WIDGETS — Spotlight + Contact Reason mini
+// ════════════════════════════════════════════════════════════
+
+// Auto-detects movers and patterns worth attention. Compares "this period"
+// vs the matching previous period (last week vs this week, last month vs this month).
+function renderDashSpotlight(){
+  const el = document.getElementById('dash-spotlight');
+  if(!el) return;
+  const period = document.getElementById('dash-period')?.value || 'this-month';
+
+  // Pick the "comparable previous" period for delta analysis
+  let currentMode, previousMode;
+  if(period === 'this-week' || period === 'week'){ currentMode = 'this-week'; previousMode = 'last-week'; }
+  else if(period === 'last-week'){ currentMode = 'last-week'; previousMode = null; }
+  else if(period === 'last-month'){ currentMode = 'last-month'; previousMode = null; }
+  else { currentMode = 'this-month'; previousMode = 'last-month'; }
+
+  // For each spec, calculate avg CSAT in current and previous period
+  const movers = SPECIALISTS.map(s => {
+    const myMetrics = db.metrics.filter(m => m.specialistId === s.id);
+    const cur  = filterByPeriod(myMetrics, currentMode,  'dash-period');
+    const prev = previousMode ? filterByPeriod(myMetrics, previousMode, 'dash-period') : [];
+    const curCsat  = avg(cur,  'csat');
+    const prevCsat = avg(prev, 'csat');
+    const curQa    = avg(cur,  'qa');
+    const curTph   = avg(cur,  'tph');
+    // Recent DSATs in current period
+    const myDsats = db.dsats.filter(d => d.specialistId === s.id);
+    const curDsats = filterByPeriod(myDsats, currentMode, 'dash-period');
+    const agentDsats = curDsats.filter(d => d.responsibility === 'agent').length;
+    return {
+      s, cur, prev, curCsat, prevCsat, curQa, curTph,
+      csatDelta: (curCsat != null && prevCsat != null) ? curCsat - prevCsat : null,
+      curDsats: curDsats.length,
+      agentDsats
+    };
+  });
+
+  // Top mover: biggest positive CSAT delta
+  const topMover = movers
+    .filter(m => m.csatDelta != null && m.csatDelta > 1)
+    .sort((a,b) => b.csatDelta - a.csatDelta)[0];
+
+  // Watch closely: lowest CSAT OR highest agent-DSAT count this period
+  const watch = movers
+    .filter(m => m.curCsat != null)
+    .filter(m => m.curCsat < 75 || m.agentDsats >= 2)
+    .sort((a,b) => (a.curCsat||100) - (b.curCsat||100))[0];
+
+  // Streak breaker: biggest negative CSAT delta (someone slipping)
+  const slipping = movers
+    .filter(m => m.csatDelta != null && m.csatDelta < -2)
+    .sort((a,b) => a.csatDelta - b.csatDelta)[0];
+
+  const cards = [];
+
+  if(topMover){
+    cards.push({
+      bg: 'rgba(16,185,129,.08)', border:'rgba(16,185,129,.25)', color:'#059669',
+      emoji: '🚀',
+      title: 'Top Mover',
+      name: topMover.s.name,
+      sid: topMover.s.id,
+      headline: `+${topMover.csatDelta.toFixed(1)}pts CSAT`,
+      detail: `Up from ${topMover.prevCsat.toFixed(1)}% to ${topMover.curCsat.toFixed(1)}%. Recognize the progress.`
+    });
+  }
+
+  if(watch){
+    const reasons = [];
+    if(watch.curCsat < 75) reasons.push(`CSAT at ${watch.curCsat.toFixed(1)}%`);
+    if(watch.agentDsats >= 2) reasons.push(`${watch.agentDsats} agent-related DSATs`);
+    cards.push({
+      bg: 'rgba(245,158,11,.08)', border:'rgba(245,158,11,.25)', color:'#B45309',
+      emoji: '👀',
+      title: 'Watch Closely',
+      name: watch.s.name,
+      sid: watch.s.id,
+      headline: reasons[0] || 'Needs attention',
+      detail: reasons.length > 1 ? reasons.slice(1).join(' · ') + '.' : 'Consider scheduling a 1:1 this week.'
+    });
+  }
+
+  if(slipping && (!watch || slipping.s.id !== watch.s.id)){
+    cards.push({
+      bg: 'rgba(239,68,68,.08)', border:'rgba(239,68,68,.25)', color:'#DC2626',
+      emoji: '📉',
+      title: 'Streak Breaker',
+      name: slipping.s.name,
+      sid: slipping.s.id,
+      headline: `${slipping.csatDelta.toFixed(1)}pts CSAT`,
+      detail: `Slipped from ${slipping.prevCsat.toFixed(1)}% to ${slipping.curCsat.toFixed(1)}%. Worth a check-in.`
+    });
+  }
+
+  // Team-wide auto-insight: most-improved KPI or biggest concern
+  const teamPrev = previousMode ? filterByPeriod(db.metrics, previousMode, 'dash-period') : [];
+  const teamCur  = filterByPeriod(db.metrics, currentMode,  'dash-period');
+  const teamCsatNow = avg(teamCur, 'csat'), teamCsatPrev = avg(teamPrev, 'csat');
+  if(teamCsatNow != null && teamCsatPrev != null){
+    const delta = teamCsatNow - teamCsatPrev;
+    if(Math.abs(delta) > 0.5){
+      cards.push({
+        bg: delta > 0 ? 'rgba(99,102,241,.08)' : 'rgba(245,158,11,.08)',
+        border: delta > 0 ? 'rgba(99,102,241,.25)' : 'rgba(245,158,11,.25)',
+        color: delta > 0 ? '#4F46E5' : '#B45309',
+        emoji: delta > 0 ? '📈' : '📊',
+        title: 'Team Trend',
+        name: 'Team-wide',
+        sid: null,
+        headline: `${delta>0?'+':''}${delta.toFixed(1)}pts CSAT`,
+        detail: `Team CSAT went from ${teamCsatPrev.toFixed(1)}% to ${teamCsatNow.toFixed(1)}% vs the previous period.`
+      });
+    }
+  }
+
+  // Update sub label
+  const subEl = document.getElementById('spotlight-sub');
+  if(subEl){
+    const periodLabel = periodLabelFor('dash-period');
+    subEl.textContent = previousMode
+      ? `${periodLabel} vs previous · auto-detected`
+      : `${periodLabel} · auto-detected`;
+  }
+
+  if(!cards.length){
+    el.innerHTML = `<div class="empty" style="padding:32px"><div class="ei">✨</div><p>Nothing standout to flag — your team is humming along.</p></div>`;
+    return;
+  }
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px">
+    ${cards.map(c => `<div onclick="${c.sid?`navTo('spec-detail','${c.sid}')`:''}" style="background:${c.bg};border:1px solid ${c.border};border-left:4px solid ${c.color};border-radius:10px;padding:14px 16px;${c.sid?'cursor:pointer':''}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:18px">${c.emoji}</span>
+        <span style="font-size:11px;font-weight:800;color:${c.color};text-transform:uppercase;letter-spacing:.06em">${esc(c.title)}</span>
+      </div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">${esc(c.name)}</div>
+      <div style="font-family:'Inter',sans-serif;font-size:18px;font-weight:800;color:${c.color};margin-bottom:6px">${esc(c.headline)}</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.5">${esc(c.detail)}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// Mini Contact Reason chart for the Dashboard — top 5 reasons by volume.
+function renderDashContactReason(){
+  const el = document.getElementById('dash-cr');
+  const card = document.getElementById('dash-cr-card');
+  const subEl = document.getElementById('dash-cr-sub');
+  if(!el) return;
+  const period = document.getElementById('dash-period')?.value || 'this-month';
+  const all = (db.csatResponses || []).map(r => ({...r, date: r.updateDate || (r.createdAt||'').slice(0,10)}));
+  const responses = filterByPeriod(all, period, 'dash-period');
+
+  // Hide the card if there's no drilldown data at all
+  if(!(db.csatResponses || []).length){
+    if(card) card.style.display = 'none';
+    return;
+  }
+  if(card) card.style.display = '';
+
+  if(!responses.length){
+    el.innerHTML = `<div class="empty" style="padding:24px"><div class="ei">💬</div><p>No CSAT responses in this period.</p></div>`;
+    return;
+  }
+
+  const byReason = {};
+  responses.forEach(r => {
+    const reason = r.contactReason || '(no reason)';
+    if(!byReason[reason]) byReason[reason] = {good:0, bad:0, total:0};
+    byReason[reason].total++;
+    if(r.sentiment === 'good') byReason[reason].good++;
+    else if(r.sentiment === 'bad') byReason[reason].bad++;
+  });
+  const rows = Object.entries(byReason)
+    .map(([reason, x]) => ({reason, ...x, csatPct: x.total ? Math.round(x.good / x.total * 100) : 0}))
+    .sort((a,b) => b.total - a.total)
+    .slice(0, 5);
+
+  const totalGood = responses.filter(r => r.sentiment === 'good').length;
+  const totalBad  = responses.filter(r => r.sentiment === 'bad').length;
+  const teamCsat = (totalGood + totalBad) ? Math.round(totalGood / (totalGood + totalBad) * 100) : 0;
+  if(subEl) subEl.textContent = `${periodLabelFor('dash-period')} · ${responses.length} responses · ${teamCsat}% team CSAT`;
+
+  el.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">${rows.map(r => {
+    const goodPct = r.total ? (r.good / r.total) * 100 : 0;
+    const badPct  = r.total ? (r.bad  / r.total) * 100 : 0;
+    const csatColor = r.csatPct >= 80 ? '#10B981' : r.csatPct >= 60 ? '#F59E0B' : '#EF4444';
+    return `<div style="display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">${esc(r.reason)}</span>
+          <span style="font-size:11px;color:var(--text3)">${r.total} total · <span style="color:${csatColor};font-weight:700">${r.csatPct}% CSAT</span></span>
+        </div>
+        <div style="display:flex;height:8px;background:var(--surface3);border-radius:99px;overflow:hidden">
+          <div style="width:${goodPct}%;background:#10B981" title="${r.good} good"></div>
+          <div style="width:${badPct}%;background:#EF4444" title="${r.bad} bad"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -4823,15 +5053,31 @@ function renderMyOverview(){
   if(!latest){
     document.getElementById('my-kpis').innerHTML=`<div class="stat-card" style="grid-column:1/-1"><div class="empty" style="padding:20px"><div class="ei">📊</div><p>No metrics recorded for you yet.</p></div></div>`;
   } else {
+    // Pre-compute the last 30 days of values for each KPI for sparklines.
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    const recent = db.metrics
+      .filter(m => m.specialistId === sid && m.date)
+      .filter(m => parseDateLocal(m.date) >= cutoff)
+      .sort((a,b) => a.date.localeCompare(b.date));
     document.getElementById('my-kpis').innerHTML=METRIC_DEFS.map(m=>{
       const v=latest[m.key],pv=prev?.[m.key];
       const trend=v!=null&&pv!=null?(v-pv).toFixed(1):null;
       const tOk=trend!=null?(m.hb?trend>0:trend<0):null;
       const onTgt=m.target!=null&&v!=null?(m.hb?v>=m.target:v<=m.target):null;
-      return`<div class="stat-card ${onTgt===true?'sc-green':onTgt===false?'sc-red':''}"><div class="sl">${m.label}${m.unit?` (${m.unit})`:''}</div><div class="sv">${v!=null&&v!==''?v+m.unit:'—'}</div><div class="ss">${trend!=null?`<span style="color:${tOk?'#34D399':'#FCA5A5'}">${trend>0?'▲':'▼'} ${Math.abs(trend)}${m.unit}</span>`:(m.target!=null?`Target: ${m.target}${m.unit}`:'')}</div></div>`;
+      // Sparkline values for this KPI
+      const series = recent.map(r => +r[m.key]).filter(x => !isNaN(x));
+      const spark = series.length >= 2 ? sparklineSvg(series, m.hb, m.target) : '';
+      return`<div class="stat-card ${onTgt===true?'sc-green':onTgt===false?'sc-red':''}">
+        <div class="sl">${m.label}${m.unit?` (${m.unit})`:''}</div>
+        <div class="sv">${v!=null&&v!==''?v+m.unit:'—'}</div>
+        ${spark}
+        <div class="ss">${trend!=null?`<span style="color:${tOk?'#34D399':'#FCA5A5'}">${trend>0?'▲':'▼'} ${Math.abs(trend)}${m.unit}</span>`:(m.target!=null?`Target: ${m.target}${m.unit}`:'')}</div>
+      </div>`;
     }).join('');
   }
   renderLineChart('chart-my-trend',sid,'csat');
+  renderMyVsTeam(sid);
+  renderMySurveys(sid);
   const pending=db.dsats.filter(d=>d.specialistId===sid&&d.status==='pending');
   document.getElementById('my-pending-dsats').innerHTML=pending.length
     ?pending.map(d=>`<div class="dsat-card pending" style="cursor:pointer" onclick="navTo('my-dsats')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:700;color:var(--text)">Ticket #${esc(d.ticketId)}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(asMultiList(d.subreason).join(', ')||'—')} · ${fmt(d.date)}</div></div><button class="btn btn-warn btn-sm" onclick="event.stopPropagation();openAckModal('${d.id}')">Acknowledge</button></div></div>`).join('')
@@ -4855,6 +5101,185 @@ function renderMyOverview(){
       }).join('')
     : '<div class="empty" style="padding:24px"><div class="ei">🎯</div><p>All QA reviews acknowledged!</p></div>';
   updateDsatBadges();
+}
+
+// Renders an inline SVG sparkline for a KPI series. `higherBetter` decides
+// the trend color (green if up for higher-better, red if down, vice versa).
+function sparklineSvg(values, higherBetter, target){
+  const W = 100, H = 24, pad = 2;
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const stepX = (W - pad*2) / Math.max(1, values.length - 1);
+  const ys = values.map(v => H - pad - ((v - min) / range) * (H - pad*2));
+  const xs = values.map((_, i) => pad + i * stepX);
+  const points = values.map((_, i) => `${xs[i].toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const first = values[0], last = values[values.length-1];
+  const trendUp = last > first;
+  const color = (higherBetter ? trendUp : !trendUp) ? '#10B981' : '#EF4444';
+  // Area fill underneath
+  const area = `${pad},${H-pad} ${points} ${(pad + (values.length-1)*stepX).toFixed(1)},${H-pad}`;
+  // Optional target line
+  let targetLine = '';
+  if(target != null && target >= min && target <= max){
+    const ty = H - pad - ((target - min) / range) * (H - pad*2);
+    targetLine = `<line x1="${pad}" y1="${ty.toFixed(1)}" x2="${W-pad}" y2="${ty.toFixed(1)}" stroke="${color}" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.4"/>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:24px;margin:6px 0;display:block">
+    <polygon points="${area}" fill="${color}" opacity="0.12"/>
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${targetLine}
+    <circle cx="${xs[xs.length-1].toFixed(1)}" cy="${ys[ys.length-1].toFixed(1)}" r="1.8" fill="${color}"/>
+  </svg>`;
+}
+
+// Renders the specialist's rank for CSAT, TPH, QA vs the rest of the team.
+function renderMyVsTeam(sid){
+  const el = document.getElementById('my-vs-team');
+  const sub = document.getElementById('my-vs-team-sub');
+  if(!el) return;
+  // Use current-month metrics for the comparison
+  const rows = SPECIALISTS.map(s => {
+    const mine = db.metrics.filter(m => m.specialistId === s.id);
+    const inMonth = filterByPeriod(mine, 'this-month', 'dash-period');
+    return {
+      sid: s.id,
+      csat: avg(inMonth, 'csat'),
+      tph:  avg(inMonth, 'tph'),
+      qa:   avg(inMonth, 'qa')
+    };
+  });
+  if(sub) sub.textContent = `${periodLabelFor('dash-period') || 'This Month'} · how you stack up across ${rows.filter(r=>r.csat!=null).length} ranked specialists`;
+
+  const me = rows.find(r => r.sid === sid);
+  if(!me || (me.csat == null && me.tph == null && me.qa == null)){
+    el.innerHTML = `<div class="empty" style="padding:24px"><div class="ei">📊</div><p>No metrics this month yet — your rank will appear once data is recorded.</p></div>`;
+    return;
+  }
+
+  const teamSize = SPECIALISTS.length;
+  const rankFor = (key, higherBetter) => {
+    const ranked = rows.filter(r => r[key] != null);
+    if(!ranked.length) return null;
+    ranked.sort((a,b) => higherBetter ? b[key] - a[key] : a[key] - b[key]);
+    const idx = ranked.findIndex(r => r.sid === sid);
+    if(idx < 0) return null;
+    return {position: idx + 1, total: ranked.length, value: me[key], percentile: 1 - (idx / ranked.length)};
+  };
+
+  const kpis = [
+    {key:'csat', label:'CSAT', unit:'%', hb:true,  target:80, color:'#3B82F6', emoji:'💬'},
+    {key:'tph',  label:'TPH',  unit:'',  hb:true,  target:5,  color:'#10B981', emoji:'⚡'},
+    {key:'qa',   label:'QA',   unit:'%', hb:true,  target:85, color:'#7C3AED', emoji:'🎯'}
+  ];
+
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+    ${kpis.map(k => {
+      const r = rankFor(k.key, k.hb);
+      if(!r) return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${k.emoji} ${k.label}</div><div style="color:var(--text3)">— No data —</div></div>`;
+      // Phrase the rank: top 3 → "Top 3", top half → "Top half", bottom half → "Mid-pack"
+      let badge, badgeColor;
+      if(r.position === 1)       { badge = '🥇 #1 on team';      badgeColor = '#F59E0B'; }
+      else if(r.position === 2)  { badge = '🥈 #2 on team';      badgeColor = '#94A3B8'; }
+      else if(r.position === 3)  { badge = '🥉 #3 on team';      badgeColor = '#C4A36A'; }
+      else if(r.percentile >= 0.6){ badge = `Top half · #${r.position}`; badgeColor = '#10B981'; }
+      else                        { badge = `Mid-pack · #${r.position}`; badgeColor = '#94A3B8'; }
+      const onTarget = r.value >= k.target;
+      return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:4px solid ${k.color};border-radius:10px;padding:14px">
+        <div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${k.emoji} ${k.label}</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+          <div style="font-family:'Inter',sans-serif;font-size:24px;font-weight:800;color:var(--text)">${r.value.toFixed(1)}${k.unit}</div>
+          <div style="font-size:11px;color:${onTarget?'#10B981':'#EF4444'};font-weight:700">${onTarget?'✓ above':'✗ below'} target ${k.target}${k.unit}</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-size:12px;font-weight:700;color:${badgeColor}">${badge}</span>
+          <span style="font-size:11px;color:var(--text3)">of ${r.total}</span>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// Renders the specialist's own CSAT drilldown: total good/bad + top reasons.
+function renderMySurveys(sid){
+  const el = document.getElementById('my-surveys');
+  const sub = document.getElementById('my-surveys-sub');
+  const card = document.getElementById('my-surveys-card');
+  if(!el) return;
+  // Find this specialist's surveys — match by email since CSAT drill rows store email
+  const spec = SPECIALISTS.find(s => s.id === sid);
+  if(!spec || !spec.email){
+    if(card) card.style.display = 'none';
+    return;
+  }
+  const myEmail = String(spec.email).toLowerCase().trim();
+  const mine = (db.csatResponses || []).filter(r => String(r.email||'').toLowerCase().trim() === myEmail);
+  if(!mine.length){
+    if(card) card.style.display = 'none';
+    return;
+  }
+  if(card) card.style.display = '';
+
+  // Last 60 days by default
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60);
+  const recent = mine.filter(r => {
+    const d = parseDateLocal(r.updateDate || r.createdAt || '');
+    return d && d >= cutoff;
+  });
+  const responses = recent.length ? recent : mine; // fall back to all if nothing recent
+  const periodLabel = recent.length ? 'Last 60 days' : 'All time';
+
+  const good = responses.filter(r => r.sentiment === 'good').length;
+  const bad  = responses.filter(r => r.sentiment === 'bad').length;
+  const csatPct = (good + bad) ? Math.round(good / (good + bad) * 100) : 0;
+
+  // Group by contact reason
+  const byReason = {};
+  responses.forEach(r => {
+    const reason = r.contactReason || '(no reason)';
+    if(!byReason[reason]) byReason[reason] = {good:0, bad:0, total:0};
+    byReason[reason].total++;
+    if(r.sentiment === 'good') byReason[reason].good++;
+    else if(r.sentiment === 'bad') byReason[reason].bad++;
+  });
+  const rows = Object.entries(byReason)
+    .map(([reason, x]) => ({reason, ...x, csatPct: x.total ? Math.round(x.good / x.total * 100) : 0}))
+    .sort((a,b) => b.total - a.total)
+    .slice(0, 8);
+
+  if(sub) sub.textContent = `${periodLabel} · ${responses.length} survey${responses.length===1?'':'s'} · ${csatPct}% CSAT`;
+
+  el.innerHTML = `
+    <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:140px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.22);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;font-weight:800;color:#059669;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">👍 Good</div>
+        <div style="font-family:'Inter',sans-serif;font-size:28px;font-weight:800;color:#059669">${good}</div>
+      </div>
+      <div style="flex:1;min-width:140px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;font-weight:800;color:#DC2626;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">👎 Bad</div>
+        <div style="font-family:'Inter',sans-serif;font-size:28px;font-weight:800;color:#DC2626">${bad}</div>
+      </div>
+      <div style="flex:1;min-width:140px;background:${csatPct>=80?'rgba(16,185,129,.08)':csatPct>=60?'rgba(245,158,11,.08)':'rgba(239,68,68,.08)'};border:1px solid ${csatPct>=80?'rgba(16,185,129,.22)':csatPct>=60?'rgba(245,158,11,.25)':'rgba(239,68,68,.25)'};border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;font-weight:800;color:${csatPct>=80?'#059669':csatPct>=60?'#B45309':'#DC2626'};text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Your CSAT</div>
+        <div style="font-family:'Inter',sans-serif;font-size:28px;font-weight:800;color:${csatPct>=80?'#059669':csatPct>=60?'#B45309':'#DC2626'}">${csatPct}%</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Top contact reasons</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${rows.map(r => {
+      const goodPct = r.total ? (r.good / r.total) * 100 : 0;
+      const badPct  = r.total ? (r.bad  / r.total) * 100 : 0;
+      const csatColor = r.csatPct >= 80 ? '#10B981' : r.csatPct >= 60 ? '#F59E0B' : '#EF4444';
+      return `<div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px">${esc(r.reason)}</span>
+          <span style="font-size:11px;color:var(--text3)">${r.total} · <span style="color:${csatColor};font-weight:700">${r.csatPct}%</span></span>
+        </div>
+        <div style="display:flex;height:8px;background:var(--surface3);border-radius:99px;overflow:hidden">
+          <div style="width:${goodPct}%;background:#10B981"></div>
+          <div style="width:${badPct}%;background:#EF4444"></div>
+        </div>
+      </div>`;
+    }).join('')}</div>
+  `;
 }
 
 // Renders a card at the top of the specialist's overview showing their NEXT
