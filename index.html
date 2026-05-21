@@ -583,10 +583,11 @@ textarea{resize:vertical;min-height:78px}
     <div class="ph"><div class="ph-left"><h1>Bulk Import</h1><p>Upload a CSV or XLSX file to bulk-load metrics or QA entries</p></div></div>
 
     <div class="tab-bar" style="margin-bottom:18px">
-      <button class="tab-btn active" data-imp-tab="tph"     onclick="switchImportTab('tph')">⚡ TPH (Weekly)</button>
-      <button class="tab-btn"        data-imp-tab="csat"    onclick="switchImportTab('csat')">💬 CSAT (Weekly)</button>
-      <button class="tab-btn"        data-imp-tab="monthly" onclick="switchImportTab('monthly')">🗓 Monthly</button>
-      <button class="tab-btn"        data-imp-tab="qas"     onclick="switchImportTab('qas')">🎯 QA</button>
+      <button class="tab-btn active" data-imp-tab="tph"        onclick="switchImportTab('tph')">⚡ TPH (Weekly)</button>
+      <button class="tab-btn"        data-imp-tab="csat"       onclick="switchImportTab('csat')">💬 CSAT (Weekly)</button>
+      <button class="tab-btn"        data-imp-tab="monthly"    onclick="switchImportTab('monthly')">🗓 Monthly</button>
+      <button class="tab-btn"        data-imp-tab="csat-drill" onclick="switchImportTab('csat-drill')">💭 CSAT Drilldown</button>
+      <button class="tab-btn"        data-imp-tab="qas"        onclick="switchImportTab('qas')">🎯 QA</button>
     </div>
 
     <!-- ─────────── TPH WEEKLY IMPORT ─────────── -->
@@ -717,6 +718,56 @@ textarea{resize:vertical;min-height:78px}
     </div>
 
 
+    <!-- ─────────── CSAT DRILLDOWN IMPORT ─────────── -->
+    <div class="imp-tab-content" id="imp-tab-csat-drill" style="display:none">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">💭 CSAT Drilldown Format</div><div class="card-sub">Detailed CSAT response log — one row per survey response. Powers the Contact Reason analytics on the Analytics page.</div></div></div>
+        <div class="tw">
+          <table><thead><tr><th>Column</th><th>Field</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>Week</code></td><td>Week number</td><td>1–52</td></tr>
+            <tr><td><code>Update - Date</code></td><td>Update date</td><td>YYYY-MM-DD or sheet date</td></tr>
+            <tr><td><code>Ticket channel</code></td><td>Channel</td><td>Email / Chat / Phone</td></tr>
+            <tr><td><code>Contact Reason for Customers</code></td><td>Reason</td><td style="color:var(--accent);font-weight:600">Required — this is the dimension for analytics</td></tr>
+            <tr><td><code>Changes - Field name</code></td><td>Field changed</td><td>Optional</td></tr>
+            <tr><td><code>Changes - New value</code></td><td>Sentiment</td><td style="color:var(--accent);font-weight:600">Required — must contain "good" or "bad"</td></tr>
+            <tr><td><code>Email</code></td><td>Specialist Email</td><td>Optional — matched to specialist when available</td></tr>
+            <tr><td><code>Update ticket assignee</code></td><td>Assignee</td><td>Optional</td></tr>
+            <tr><td><code>Ticket ID</code></td><td>Ticket ID</td><td></td></tr>
+            <tr><td><code>Month (updated)</code></td><td>Month</td><td>Number 1–12 or month name</td></tr>
+            <tr><td><code>Supervisor</code></td><td>Supervisor</td><td>Optional</td></tr>
+            <tr><td><code>A.Manager</code></td><td>Account Manager</td><td>Optional</td></tr>
+            <tr><td><code>Tenure</code></td><td>Tenure</td><td>Optional</td></tr>
+            <tr><td><code>Status</code></td><td>Status</td><td>Optional</td></tr>
+            <tr><td><code>Team</code></td><td>Team</td><td>Optional</td></tr>
+            <tr><td><code>Channel</code></td><td>Channel</td><td>Optional</td></tr>
+          </tbody></table>
+        </div>
+        <div style="margin-top:14px;padding:11px 14px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.18);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.55"><strong>💡 How it's used:</strong> Each row becomes a CSAT response. The Analytics page will break down good/bad counts by Contact Reason so you can see which reasons drive positive or negative sentiment on your team.</div>
+        <div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="downloadMetricsTemplate('csat-drill')">📥 Download template</button></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-hd"><div class="card-title">Upload File</div></div>
+        <label class="csv-zone" id="csv-zone-csat-drill" for="csv-file-csat-drill">
+          <input type="file" id="csv-file-csat-drill" accept=".csv,.xlsx,.xls,text/csv" onchange="previewCsatDrillFile(this)">
+          <div style="font-size:28px;margin-bottom:10px">📁</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to select CSV or XLSX file</div>
+          <div style="font-size:12px;color:var(--text3)">or drag and drop</div>
+        </label>
+        <div id="csv-status-csat-drill" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+        <div id="csv-preview-wrap-csat-drill" style="display:none;margin-top:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Preview (first 8 rows)</div>
+          <div class="tw" id="csv-preview-table-csat-drill"></div>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:14px;align-items:center">
+          <button class="btn btn-primary" id="csv-import-btn-csat-drill" onclick="importCsatDrill()" disabled>⬆️ Import CSAT Responses</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearCsatDrillImport()">Clear</button>
+          <span id="csv-import-status-csat-drill" style="font-size:12px;color:var(--text3)"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- ─────────── QA IMPORT ─────────── -->
     <div class="imp-tab-content" id="imp-tab-qas" style="display:none">
       <div class="card">
@@ -811,6 +862,14 @@ textarea{resize:vertical;min-height:78px}
         <select id="an-resp-period" onchange="onPeriodFilterChange('an-resp-period', renderDsatResponsibility)" style="font-size:12px;width:auto;padding:7px 11px"></select>
       </div>
       <div id="an-resp-body"></div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card-hd" style="align-items:center;flex-wrap:wrap;gap:10px">
+        <div><div class="card-title">💬 CSAT by Contact Reason</div><div class="card-sub">Which contact reasons drive good vs bad sentiment</div></div>
+        <select id="an-cr-period" onchange="onPeriodFilterChange('an-cr-period', renderCsatByContactReason)" style="font-size:12px;width:auto;padding:7px 11px"></select>
+      </div>
+      <div id="an-cr-body"></div>
     </div>
   </div>
 
@@ -1870,7 +1929,7 @@ const SHEET_URL_KEY = 'teamhub_sheet_url';
 // specialists don't need to paste a URL on their device. The Settings → Cloud Sync
 // override is still available for testing.
 // ════════════════════════════════════════════════════════════
-const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbz3ZVewtZtXNWmVFNzPCGuyeCC85aQQ9YF-FiFJnkS8IgBbkQOXtwI8fpqxF2OlcPCMGg/exec';   // ← paste your /exec URL here
+const BUILT_IN_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzgnvEuEYxHby1F1-YmZINIvPVbBrZLcttwIUFeYUVdtdgRH2Lmv1svPBe7N1CPOJ7wVw/exec';   // ← paste your /exec URL here
 
 // ════════════════════════════════════════════════════════════
 // CLOUD SYNC (Google Apps Script backend)
@@ -2027,6 +2086,13 @@ function hydrateFromCloud(cloud){
     ...f,
     specialistId: f.specialistId != null ? String(f.specialistId).trim() : ''
   }));
+  // CSAT drilldown responses
+  db.csatResponses = (cloud.csatResponses || []).map(r => ({
+    ...r,
+    sentiment: String(r.sentiment || '').toLowerCase().trim(),
+    contactReason: String(r.contactReason || '').trim(),
+    email: String(r.email || '').toLowerCase().trim()
+  }));
   // Settings
   db.settings = cloud.settings || {};
   if(db.settings.adminPin) db.pin = String(db.settings.adminPin);
@@ -2099,6 +2165,7 @@ function loadDB(){
     if(!Array.isArray(saved.appointments)) saved.appointments = [];
     if(!Array.isArray(saved.talkingPoints)) saved.talkingPoints = [];
     if(!Array.isArray(saved.leadFeedback)) saved.leadFeedback = [];
+    if(!Array.isArray(saved.csatResponses)) saved.csatResponses = [];
     // Migrate: ensure customSpecialists exists, and re-hydrate them into SPECIALISTS
     if(!Array.isArray(saved.customSpecialists)) saved.customSpecialists = [];
     saved.customSpecialists.forEach(cs=>{
@@ -2139,7 +2206,7 @@ function loadDB(){
 }
 function defaultDB(){
   return {
-    metrics:[], dsats:[], sessions:[], qas:[], appointments:[], talkingPoints:[], leadFeedback:[],
+    metrics:[], dsats:[], sessions:[], qas:[], appointments:[], talkingPoints:[], leadFeedback:[], csatResponses:[],
     pin: DEFAULT_PIN,
     customSpecialists: [],
     specPasswords: Object.fromEntries(SPECIALISTS.map(s=>[s.id,''])),
@@ -3441,10 +3508,11 @@ let parsedQaRows  = [];     // QA rows parsed and validated
 
 function switchImportTab(tab){
   document.querySelectorAll('[data-imp-tab]').forEach(b => b.classList.toggle('active', b.dataset.impTab === tab));
-  document.getElementById('imp-tab-tph').style.display     = tab === 'tph'     ? '' : 'none';
-  document.getElementById('imp-tab-csat').style.display    = tab === 'csat'    ? '' : 'none';
-  document.getElementById('imp-tab-monthly').style.display = tab === 'monthly' ? '' : 'none';
-  document.getElementById('imp-tab-qas').style.display     = tab === 'qas'     ? '' : 'none';
+  document.getElementById('imp-tab-tph').style.display        = tab === 'tph'        ? '' : 'none';
+  document.getElementById('imp-tab-csat').style.display       = tab === 'csat'       ? '' : 'none';
+  document.getElementById('imp-tab-monthly').style.display    = tab === 'monthly'    ? '' : 'none';
+  document.getElementById('imp-tab-csat-drill').style.display = tab === 'csat-drill' ? '' : 'none';
+  document.getElementById('imp-tab-qas').style.display        = tab === 'qas'        ? '' : 'none';
 }
 
 // ─── Date helpers ────────────────────────────────────────────
@@ -3791,7 +3859,7 @@ function downloadMetricsTemplate(period){
       ['walter@cookunity.com',     '86.7', '31', '4', '35', '18', String(currentYear)]
     ];
     filename = 'csat-weekly-template.csv';
-  } else {
+  } else if(period === 'monthly'){
     headers = ['specialist','month','year','csat','goodSurveys','badSurveys','totalSurveys','iqs','tickets','aht','tph','notes','recognition'];
     samples = [
       // Same specialist across months + a different specialist — drop in as many rows as you have data
@@ -3802,6 +3870,16 @@ function downloadMetricsTemplate(period){
       ['Walter Ylesca',     '4', String(currentYear), '83.5', '124', '20', '144', '87.5', '478', '6.6', '4.8', '', '']
     ];
     filename = 'monthly-template.csv';
+  } else if(period === 'csat-drill'){
+    headers = ['Week','Update - Date','Ticket channel','Contact Reason for Customers','Changes - Field name','Changes - New value','Email','Update ticket assignee','Ticket ID','Month (updated)','Supervisor','A.Manager','Tenure','Status','Team','Channel'];
+    samples = [
+      ['18', '2026-05-01', 'Email', 'Delivery Issue',         'CSAT', 'good', 'candelaria@cookunity.com', 'Candelaria Lucena', '12345678', '5', 'Paola Pirela', 'Katherine Lino',  '8',  'Active', 'CX', 'Email'],
+      ['18', '2026-05-01', 'Email', 'Billing Question',       'CSAT', 'bad',  'walter@cookunity.com',     'Walter Ylesca',     '12345679', '5', 'Paola Pirela', 'Katherine Lino',  '12', 'Active', 'CX', 'Email'],
+      ['18', '2026-05-02', 'Chat',  'Menu / Recipe',          'CSAT', 'good', 'alejandra@cookunity.com',  'Alejandra Paredes', '12345680', '5', 'Paola Pirela', 'Katherine Lino',  '6',  'Active', 'CX', 'Chat'],
+      ['19', '2026-05-08', 'Email', 'Delivery Issue',         'CSAT', 'bad',  'candelaria@cookunity.com', 'Candelaria Lucena', '12345681', '5', 'Paola Pirela', 'Katherine Lino',  '8',  'Active', 'CX', 'Email'],
+      ['19', '2026-05-08', 'Email', 'Account / Login',        'CSAT', 'good', 'magali@cookunity.com',     'Magali Vera',       '12345682', '5', 'Paola Pirela', 'Katherine Lino',  '4',  'Active', 'CX', 'Email']
+    ];
+    filename = 'csat-drilldown-template.csv';
   }
   // CSV escape: wrap any field containing a comma or quote in quotes
   const escapeCsv = v => {
@@ -3818,6 +3896,180 @@ function downloadMetricsTemplate(period){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('📥 Template downloaded — add as many rows as you need.');
+}
+
+// ─────────── CSAT DRILLDOWN IMPORT ───────────
+
+let parsedCsatDrillRows = [];
+
+// Parses the sentiment field — handles 'good' / 'bad' in any casing, plus
+// common synonyms ("positive"/"negative", "yes"/"no", "1"/"0", "👍"/"👎")
+function parseCsatSentiment(v){
+  if(v == null) return null;
+  const s = String(v).toLowerCase().trim();
+  if(!s) return null;
+  if(s === 'good' || s === 'positive' || s === '1' || s === 'yes' || s === 'true' || s.includes('👍')) return 'good';
+  if(s === 'bad'  || s === 'negative' || s === '0' || s === 'no'  || s === 'false'|| s.includes('👎')) return 'bad';
+  // Fall back: anything containing "good" or "bad" as a substring
+  if(s.includes('good')) return 'good';
+  if(s.includes('bad'))  return 'bad';
+  return null;
+}
+
+// Maps a column-renamed header to a clean key
+const CSAT_DRILL_HEADER_MAP = {
+  'week':                       'week',
+  'update - date':              'updateDate',
+  'update date':                'updateDate',
+  'ticket channel':             'ticketChannel',
+  'contact reason for customers':'contactReason',
+  'contact reason':             'contactReason',
+  'changes - field name':       'fieldName',
+  'changes - new value':        'newValue',
+  'email':                      'email',
+  'update ticket assignee':     'assignee',
+  'ticket id':                  'ticketId',
+  'month (updated)':            'month',
+  'month':                      'month',
+  'supervisor':                 'supervisor',
+  'a.manager':                  'aManager',
+  'a manager':                  'aManager',
+  'tenure':                     'tenure',
+  'status':                     'status',
+  'team':                       'team',
+  'channel':                    'channel'
+};
+
+function normalizeCsatDrillRow(raw){
+  const out = {};
+  Object.keys(raw).forEach(k => {
+    const cleanKey = String(k).toLowerCase().trim();
+    const mapped = CSAT_DRILL_HEADER_MAP[cleanKey] || cleanKey;
+    out[mapped] = raw[k];
+  });
+  return out;
+}
+
+async function previewCsatDrillFile(input){
+  parsedCsatDrillRows = [];
+  document.getElementById('csv-import-btn-csat-drill').disabled = true;
+  document.getElementById('csv-status-csat-drill').style.display = 'none';
+  document.getElementById('csv-preview-wrap-csat-drill').style.display = 'none';
+  const file = input.files[0]; if(!file) return;
+  const statusEl = document.getElementById('csv-status-csat-drill');
+
+  let rows;
+  try { rows = await readSpreadsheetFile(file); }
+  catch(err){
+    statusEl.textContent = '❌ ' + err.message;
+    statusEl.style.background = 'rgba(239,68,68,.1)'; statusEl.style.color = '#FCA5A5'; statusEl.style.display = 'block';
+    return;
+  }
+  rows = rows.filter(r => Object.values(r).some(v => v !== ''));
+  // Normalize headers
+  const normalized = rows.map(r => normalizeCsatDrillRow(r));
+
+  let validCount = 0, invalidCount = 0;
+  const resolved = normalized.map(r => {
+    const errors = [];
+    const sentiment = parseCsatSentiment(r.newValue);
+    const contactReason = String(r.contactReason || '').trim();
+    if(!contactReason) errors.push('contact reason required');
+    if(!sentiment) errors.push('sentiment unclear (need good/bad)');
+    if(errors.length) invalidCount++; else validCount++;
+    return {raw: r, sentiment, contactReason, errors};
+  });
+  parsedCsatDrillRows = resolved;
+
+  let msg = `✅ Parsed ${rows.length} rows — ${validCount} valid.`;
+  if(invalidCount) msg += ` ⚠ ${invalidCount} will be skipped (missing contact reason or unclear sentiment).`;
+  statusEl.textContent = msg;
+  statusEl.style.background = invalidCount ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.1)';
+  statusEl.style.color      = invalidCount ? '#F59E0B' : '#34D399';
+  statusEl.style.display = 'block';
+
+  // Preview
+  const preview = resolved.slice(0, 8);
+  const cols = ['week','updateDate','ticketChannel','contactReason','newValue','email','assignee','ticketId'];
+  const colLabels = {week:'Week', updateDate:'Date', ticketChannel:'Channel', contactReason:'Contact Reason', newValue:'Sentiment', email:'Email', assignee:'Assignee', ticketId:'Ticket ID'};
+  const body = preview.map(item => {
+    const rowStyle = item.errors.length ? 'opacity:.55;background:rgba(245,158,11,.05)' : '';
+    const sentimentBadge = item.sentiment === 'good'
+      ? '<span style="color:#10B981;font-weight:700">👍 good</span>'
+      : item.sentiment === 'bad'
+        ? '<span style="color:#EF4444;font-weight:700">👎 bad</span>'
+        : '<span style="color:var(--text3)">—</span>';
+    const status = item.errors.length
+      ? `<span style="color:#F59E0B;font-size:11px">⚠ ${esc(item.errors.join(', '))}</span>`
+      : `<span style="color:#34D399;font-size:11px">✓ ok</span>`;
+    return `<tr style="${rowStyle}">${cols.map(c => {
+      if(c === 'newValue') return `<td>${sentimentBadge}</td>`;
+      return `<td style="font-size:11px">${esc(item.raw[c] ?? '')}</td>`;
+    }).join('')}<td>${status}</td></tr>`;
+  }).join('');
+  const header = cols.map(c => `<th>${colLabels[c] || c}</th>`).join('') + '<th>Status</th>';
+  document.getElementById('csv-preview-table-csat-drill').innerHTML = `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+  document.getElementById('csv-preview-wrap-csat-drill').style.display = 'block';
+  document.getElementById('csv-import-btn-csat-drill').disabled = validCount === 0;
+}
+
+function importCsatDrill(){
+  if(!parsedCsatDrillRows.length) return;
+  let imported = 0, skipped = 0;
+  const newEntries = [];
+  if(!Array.isArray(db.csatResponses)) db.csatResponses = [];
+
+  parsedCsatDrillRows.forEach(item => {
+    if(item.errors.length){ skipped++; return; }
+    const r = item.raw;
+    // Resolve date to YYYY-MM-DD if possible
+    let updateDate = '';
+    if(r.updateDate){
+      const d = parseDateLocal(String(r.updateDate));
+      updateDate = d ? d.toISOString().slice(0,10) : String(r.updateDate).trim();
+    }
+    const entry = {
+      id: genId(),
+      week: String(r.week || '').trim(),
+      updateDate,
+      ticketChannel: String(r.ticketChannel || '').trim(),
+      contactReason: item.contactReason,
+      sentiment: item.sentiment,
+      email: String(r.email || '').trim().toLowerCase(),
+      assignee: String(r.assignee || '').trim(),
+      ticketId: String(r.ticketId || '').trim(),
+      month: String(r.month || '').trim(),
+      supervisor: String(r.supervisor || '').trim(),
+      aManager: String(r.aManager || '').trim(),
+      tenure: String(r.tenure || '').trim(),
+      status: String(r.status || '').trim(),
+      team: String(r.team || '').trim(),
+      channel: String(r.channel || '').trim(),
+      createdAt: new Date().toISOString()
+    };
+    db.csatResponses.push(entry);
+    newEntries.push(entry);
+    imported++;
+  });
+
+  localStorage.setItem(STORE_KEY, JSON.stringify(db));
+  if(isCloudEnabled()){
+    newEntries.forEach(entry => cloudPush({tab:'CsatResponses', op:'insert', row:entry}));
+  }
+  document.getElementById('csv-import-status-csat-drill').textContent =
+    `✅ ${imported} imported, ${skipped} skipped.${isCloudEnabled()?' Syncing to sheet…':''}`;
+  toast(`✅ Imported ${imported} CSAT response(s)!`);
+  parsedCsatDrillRows = [];
+  document.getElementById('csv-import-btn-csat-drill').disabled = true;
+}
+
+function clearCsatDrillImport(){
+  parsedCsatDrillRows = [];
+  document.getElementById('csv-file-csat-drill').value = '';
+  document.getElementById('csv-status-csat-drill').style.display = 'none';
+  document.getElementById('csv-preview-wrap-csat-drill').style.display = 'none';
+  document.getElementById('csv-import-btn-csat-drill').disabled = true;
+  document.getElementById('csv-import-status-csat-drill').textContent = '';
 }
 
 // ─────────── QA IMPORT ───────────
@@ -3976,6 +4228,7 @@ function renderAnalytics(){
   renderAnalyticsLeaderboard();
   renderAnalyticsFailurePatterns();
   renderDsatResponsibility();
+  renderCsatByContactReason();
 }
 
 function renderAnalyticsLeaderboard(){
@@ -4110,6 +4363,90 @@ function renderDsatResponsibility(){
                 <div style="height:100%;width:${r.agentPct}%;background:${stripeColor}"></div>
               </div>
               <span style="font-family:'Inter',sans-serif;font-weight:800;color:${stripeColor};font-size:12px;min-width:36px">${r.agentPct}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+}
+
+// Renders CSAT-by-Contact-Reason breakdown for the Analytics page
+function renderCsatByContactReason(){
+  const el = document.getElementById('an-cr-body');
+  if(!el) return;
+  const period = document.getElementById('an-cr-period')?.value || 'this-month';
+
+  // Filter responses by selected period using `updateDate` (or `createdAt` fallback)
+  const all = (db.csatResponses || []).map(r => ({...r, date: r.updateDate || (r.createdAt||'').slice(0,10)}));
+  const responses = filterByPeriod(all, period, 'an-cr-period');
+
+  if(!responses.length){
+    el.innerHTML = '<div class="empty" style="padding:40px"><div class="ei">💬</div><p>No CSAT responses in this period.<br><span style="font-size:11px;color:var(--text3);margin-top:6px;display:block">Upload a CSAT Drilldown file in Bulk Import to populate this view.</span></p></div>';
+    return;
+  }
+
+  // Group by contactReason, tally good/bad
+  const byReason = {};
+  responses.forEach(r => {
+    const reason = r.contactReason || '(no reason)';
+    if(!byReason[reason]) byReason[reason] = {good:0, bad:0, total:0};
+    byReason[reason].total++;
+    if(r.sentiment === 'good') byReason[reason].good++;
+    else if(r.sentiment === 'bad') byReason[reason].bad++;
+  });
+
+  // Convert to rows with CSAT % per reason
+  const rows = Object.entries(byReason).map(([reason, x]) => ({
+    reason, ...x,
+    csatPct: x.total > 0 ? Math.round(x.good / x.total * 100) : 0
+  }));
+
+  // Team-wide totals
+  const totalGood = responses.filter(r => r.sentiment === 'good').length;
+  const totalBad  = responses.filter(r => r.sentiment === 'bad').length;
+  const teamCsat  = (totalGood + totalBad) ? Math.round(totalGood / (totalGood + totalBad) * 100) : 0;
+
+  // Best / worst reason by CSAT % (require min 3 responses to be ranked)
+  const ranked = rows.filter(r => r.total >= 3);
+  const best  = ranked.length ? ranked.reduce((a,b) => b.csatPct > a.csatPct ? b : a) : null;
+  const worst = ranked.length ? ranked.reduce((a,b) => b.csatPct < a.csatPct ? b : a) : null;
+  // Highest-volume bad reason (the one that drags CSAT down the most)
+  const topDragger = [...rows].sort((a,b) => b.bad - a.bad)[0];
+
+  // Sorted descending by total responses for the table
+  rows.sort((a,b) => b.total - a.total);
+
+  el.innerHTML = `
+    <div class="stats-grid" style="margin-bottom:14px">
+      <div class="stat-card sc-blue"><div class="sl">Total Responses</div><div class="sv">${responses.length}</div></div>
+      <div class="stat-card ${teamCsat>=80?'sc-green':teamCsat>=60?'sc-amber':'sc-red'}"><div class="sl">Team CSAT</div><div class="sv">${teamCsat}%</div><div class="ss">${totalGood} good · ${totalBad} bad</div></div>
+      <div class="stat-card sc-green"><div class="sl">🏆 Best Reason</div><div class="sv" style="font-size:16px">${best ? esc(best.reason) : '—'}</div><div class="ss">${best ? best.csatPct+'% CSAT · '+best.total+' responses' : 'Need 3+ responses per reason'}</div></div>
+      <div class="stat-card sc-red"><div class="sl">⚠ Most Bad Surveys</div><div class="sv" style="font-size:16px">${topDragger ? esc(topDragger.reason) : '—'}</div><div class="ss">${topDragger ? topDragger.bad+' bad of '+topDragger.total : ''}</div></div>
+    </div>
+    ${worst && best && worst.reason !== best.reason ? `
+      <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.18);border-radius:10px;padding:13px 15px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="font-size:20px">💡</div>
+        <div style="flex:1;min-width:200px;font-size:13px;color:var(--text2);line-height:1.55">
+          <strong style="color:var(--text)">Insight:</strong> <strong style="color:#DC2626">${esc(worst.reason)}</strong> has the lowest CSAT at ${worst.csatPct}% (${worst.bad} bad of ${worst.total}).
+          Compare to <strong style="color:#059669">${esc(best.reason)}</strong> at ${best.csatPct}% — that's a ${best.csatPct - worst.csatPct}-point gap to investigate.
+        </div>
+      </div>
+    ` : ''}
+    <div class="tw"><table>
+      <thead><tr><th>Contact Reason</th><th>👍 Good</th><th>👎 Bad</th><th>Total</th><th>CSAT %</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const barColor = r.csatPct >= 80 ? '#10B981' : r.csatPct >= 60 ? '#F59E0B' : '#EF4444';
+        return `<tr>
+          <td style="font-size:13px;font-weight:600;color:var(--text)">${esc(r.reason)}</td>
+          <td><span style="color:#10B981;font-weight:700">${r.good}</span></td>
+          <td><span style="color:#EF4444;font-weight:700">${r.bad}</span></td>
+          <td style="font-weight:600">${r.total}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;min-width:60px;height:6px;background:var(--surface3);border-radius:99px;overflow:hidden">
+                <div style="height:100%;width:${r.csatPct}%;background:${barColor}"></div>
+              </div>
+              <span style="font-family:'Inter',sans-serif;font-weight:800;color:${barColor};font-size:12px;min-width:36px">${r.csatPct}%</span>
             </div>
           </td>
         </tr>`;
@@ -7134,6 +7471,19 @@ document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click
     previewMetricsFile(fi, period);
   });
 });
+// CSAT Drilldown — its own preview function
+const drillZone = document.getElementById('csv-zone-csat-drill');
+if(drillZone){
+  drillZone.addEventListener('dragover',  e => { e.preventDefault(); drillZone.classList.add('drag'); });
+  drillZone.addEventListener('dragleave', () => drillZone.classList.remove('drag'));
+  drillZone.addEventListener('drop', e => {
+    e.preventDefault(); drillZone.classList.remove('drag');
+    const f = e.dataTransfer.files[0]; if(!f) return;
+    const fi = document.getElementById('csv-file-csat-drill');
+    const dt = new DataTransfer(); dt.items.add(f); fi.files = dt.files;
+    previewCsatDrillFile(fi);
+  });
+}
 const qaZone = document.getElementById('qa-csv-zone');
 if(qaZone){
   qaZone.addEventListener('dragover',e=>{e.preventDefault();qaZone.classList.add('drag');});
@@ -7145,7 +7495,7 @@ if(qaZone){
 initMetricsPeriodPicker();
 
 // Initialize all standard period filters with the unified set of options
-['dash-period','sd-fp-period','an-fp-period','an-resp-period','an-lb-period'].forEach(id => {
+['dash-period','sd-fp-period','an-fp-period','an-resp-period','an-lb-period','an-cr-period'].forEach(id => {
   const el = document.getElementById(id);
   if(el && !el.innerHTML.trim()) el.innerHTML = periodFilterOptions('this-month');
 });
