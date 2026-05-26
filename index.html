@@ -478,6 +478,16 @@ textarea{resize:vertical;min-height:78px}
 .coach-tp-text strong{font-weight:700}
 .coach-tp-text .nudge{font-size:11px;color:var(--text3);margin-top:3px;display:block;font-style:italic}
 
+/* ─── Bulk-select toolbar (e.g. on Record Metrics list) ─── */
+.bulk-toolbar{display:flex;align-items:center;gap:11px;padding:9px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;margin-bottom:11px;flex-wrap:wrap;transition:all .15s}
+.bulk-toolbar.has-selection{background:linear-gradient(135deg,rgba(99,102,241,.06),rgba(124,58,237,.09));border-color:rgba(99,102,241,.3)}
+.bulk-toolbar-count{font-size:12px;font-weight:700;color:var(--text2)}
+.bulk-toolbar.has-selection .bulk-toolbar-count{color:var(--accent)}
+.bulk-toolbar-spacer{flex:1}
+.bulk-row-checkbox{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);margin:0}
+table tr.bulk-selected{background:rgba(99,102,241,.06)}
+table tr.bulk-selected td{border-color:rgba(99,102,241,.2)}
+
 /* ─── Period-type tabs (Weekly / Monthly / All) ─── */
 .period-type-tabs{display:inline-flex;gap:3px;padding:3px;background:var(--surface2);border:1px solid var(--border);border-radius:9px}
 .ptt-btn{padding:6px 12px;background:transparent;border:none;border-radius:6px;font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;transition:all .12s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
@@ -4822,18 +4832,130 @@ function deleteMetric(id){
   });
 }
 
+// Tracks IDs of metric rows the user has checked for bulk-delete on the Record Metrics page.
+let _metricsBulkSelection = new Set();
+
 function renderMetricsPage(){
   const entries=[...db.metrics].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
-  document.getElementById('recent-metrics-table').innerHTML=entries.length?`<table>
-    <thead><tr><th>Date</th><th>Specialist</th><th>CSAT</th><th>AHT</th><th>QA</th><th>Tickets</th><th>Adh%</th><th></th></tr></thead>
-    <tbody>${entries.map(r=>{const s=SPECIALISTS.find(x=>x.id===r.specialistId);return`<tr>
-      <td>${fmt(r.date)}</td>
-      <td><div style="display:flex;align-items:center;gap:6px">${avatarHTML(s,22,9,6)}<span style="font-size:12px">${s?.name.split(' ')[0]||'?'}</span></div></td>
-      <td>${scoreCell(r.csat,85,true,'%')}</td><td>${r.aht?r.aht+' min':'—'}</td><td>${scoreCell(r.qa,90,true,'%')}</td>
-      <td>${r.tickets||'—'}</td><td>${scoreCell(r.adherence,95,true,'%')}</td>
-      <td><button class="btn btn-danger btn-xs" onclick="deleteMetric('${r.id}')">✕</button></td>
-    </tr>`}).join('')}</tbody>
-  </table>`:'<div class="empty"><div class="ei">📊</div><p>No entries yet.</p></div>';
+  const wrap = document.getElementById('recent-metrics-table');
+  if(!wrap) return;
+
+  // Drop any IDs from the selection that aren't in the visible list anymore
+  const visibleIds = new Set(entries.map(e => e.id));
+  [..._metricsBulkSelection].forEach(id => { if(!visibleIds.has(id)) _metricsBulkSelection.delete(id); });
+
+  if(!entries.length){
+    wrap.innerHTML = '<div class="empty"><div class="ei">📊</div><p>No entries yet.</p></div>';
+    return;
+  }
+
+  const allChecked = entries.every(e => _metricsBulkSelection.has(e.id));
+  const someChecked = entries.some(e => _metricsBulkSelection.has(e.id));
+  const selCount = _metricsBulkSelection.size;
+
+  wrap.innerHTML = `
+    <div class="bulk-toolbar ${selCount ? 'has-selection' : ''}" id="metrics-bulk-toolbar">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2)">
+        <input type="checkbox" class="bulk-row-checkbox" id="metrics-bulk-all" ${allChecked ? 'checked' : ''} onclick="toggleMetricsBulkAll(this.checked)">
+        Select all (${entries.length} shown)
+      </label>
+      <span class="bulk-toolbar-count">${selCount ? selCount + ' selected' : 'Tick rows to bulk-delete'}</span>
+      <div class="bulk-toolbar-spacer"></div>
+      ${selCount ? `<button class="btn btn-secondary btn-sm" onclick="clearMetricsBulkSelection()">Clear</button>` : ''}
+      <button class="btn btn-danger btn-sm" onclick="bulkDeleteMetrics()" ${selCount ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>
+        🗑 Delete ${selCount || 'selected'}
+      </button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:30px"></th>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Specialist</th>
+          <th>CSAT</th>
+          <th>AHT</th>
+          <th>QA</th>
+          <th>Tickets</th>
+          <th>Adh%</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${entries.map(r => {
+          const s = SPECIALISTS.find(x => x.id === r.specialistId);
+          const pt = getPeriodType(r);
+          const badge = pt === 'monthly'
+            ? '<span style="font-size:9px;font-weight:800;color:#7C3AED;background:rgba(124,58,237,.1);padding:2px 7px;border-radius:99px;text-transform:uppercase;letter-spacing:.04em">🗓 Monthly</span>'
+            : '<span style="font-size:9px;font-weight:800;color:#6366F1;background:rgba(99,102,241,.1);padding:2px 7px;border-radius:99px;text-transform:uppercase;letter-spacing:.04em">📆 Weekly</span>';
+          const checked = _metricsBulkSelection.has(r.id);
+          return `<tr class="${checked ? 'bulk-selected' : ''}">
+            <td><input type="checkbox" class="bulk-row-checkbox" ${checked ? 'checked' : ''} onclick="toggleMetricsBulkRow('${r.id}', this.checked)"></td>
+            <td>${fmt(r.date)}</td>
+            <td>${badge}</td>
+            <td><div style="display:flex;align-items:center;gap:6px">${avatarHTML(s,22,9,6)}<span style="font-size:12px">${s?.name.split(' ')[0]||'?'}</span></div></td>
+            <td>${scoreCell(r.csat,85,true,'%')}</td>
+            <td>${r.aht?r.aht+' min':'—'}</td>
+            <td>${scoreCell(r.qa,90,true,'%')}</td>
+            <td>${r.tickets||'—'}</td>
+            <td>${scoreCell(r.adherence,95,true,'%')}</td>
+            <td><button class="btn btn-danger btn-xs" onclick="deleteMetric('${r.id}')">✕</button></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// Toggles a single row in the bulk-selection
+function toggleMetricsBulkRow(id, checked){
+  if(checked) _metricsBulkSelection.add(id);
+  else _metricsBulkSelection.delete(id);
+  renderMetricsPage();
+}
+
+// Toggles all visible rows
+function toggleMetricsBulkAll(checked){
+  const entries = [...db.metrics].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 30);
+  if(checked){
+    entries.forEach(e => _metricsBulkSelection.add(e.id));
+  } else {
+    entries.forEach(e => _metricsBulkSelection.delete(e.id));
+  }
+  renderMetricsPage();
+}
+
+function clearMetricsBulkSelection(){
+  _metricsBulkSelection.clear();
+  renderMetricsPage();
+}
+
+// Bulk-delete the currently selected metric rows. Confirms once, then loops.
+function bulkDeleteMetrics(){
+  if(!_metricsBulkSelection.size) return;
+  const ids = [..._metricsBulkSelection];
+  const count = ids.length;
+  confirmDialog({
+    title: `Delete ${count} ${count === 1 ? 'entry' : 'entries'}?`,
+    message: `This will permanently remove ${count} metric ${count === 1 ? 'entry' : 'entries'} from your team's data. Cloud sync runs in the background.`,
+    okLabel: `🗑 Delete ${count}`,
+    onOk: () => {
+      // Snapshot IDs, clear local + selection
+      const toDelete = new Set(ids);
+      db.metrics = db.metrics.filter(m => !toDelete.has(m.id));
+      _metricsBulkSelection.clear();
+      // Save locally (we set _pendingSync = null so saveDB skips cloud)
+      _pendingSync = null;
+      saveDB();
+      // Queue each deletion against the cloud — cloudPush is a queue, will process all in order
+      if(isCloudEnabled()){
+        ids.forEach(id => cloudPush({ tab:'Metrics', op:'delete', id }));
+      }
+      toast(`🗑 Deleted ${count} ${count === 1 ? 'entry' : 'entries'}.`);
+      renderMetricsPage();
+      if(currentSpec) renderSDHistory(currentSpec);
+    }
+  });
 }
 
 // ════════════════════════════════════════════════════════════
