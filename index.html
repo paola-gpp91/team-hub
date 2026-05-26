@@ -484,7 +484,24 @@ textarea{resize:vertical;min-height:78px}
 .bulk-toolbar-count{font-size:12px;font-weight:700;color:var(--text2)}
 .bulk-toolbar.has-selection .bulk-toolbar-count{color:var(--accent)}
 .bulk-toolbar-spacer{flex:1}
-.bulk-row-checkbox{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);margin:0}
+/* Explicit checkbox style — overrides the global `input{ width:100%; padding:9px; border:... }`
+   rule, which otherwise turns the checkbox into a stretched, invisible box. */
+.bulk-row-checkbox{
+  width:18px !important;
+  height:18px !important;
+  cursor:pointer;
+  accent-color:#6366F1;
+  margin:0 !important;
+  padding:0 !important;
+  border:1.5px solid var(--border2) !important;
+  background:var(--surface) !important;
+  -webkit-appearance:checkbox !important;
+  appearance:checkbox !important;
+  display:inline-block;
+  flex-shrink:0;
+  vertical-align:middle;
+}
+table td .bulk-row-checkbox{display:block;margin:0 auto !important}
 table tr.bulk-selected{background:rgba(99,102,241,.06)}
 table tr.bulk-selected td{border-color:rgba(99,102,241,.2)}
 
